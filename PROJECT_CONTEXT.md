@@ -84,6 +84,6 @@ The application uses **Zustand** for global state (`src/lib/navigationStore.ts`)
 
 ---
 
-### Meta
+## 🏗 Admin & Meta
 
 *Last Updated: 2026-04-03*
