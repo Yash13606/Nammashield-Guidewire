@@ -11,6 +11,9 @@ const fadeUp = (delay = 0) => ({
   transition: { duration: 0.6, delay, ease: "easeOut" as any },
 });
 
+const premiumShadow =
+  "0 10px 40px rgba(232, 93, 26, 0.12), 0 0 0 1px rgba(232, 93, 26, 0.08)";
+
 const CITIES = ["Chennai", "Mumbai", "Delhi", "Bengaluru"] as const;
 const TIERS = [
   { label: "Basic", amount: 50 },
@@ -69,11 +72,10 @@ export default function SimulatorSection() {
 
         {/* Widget Card */}
         <motion.div
-          className="rounded-2xl md:rounded-3xl p-5 sm:p-10 border"
+          className="rounded-3xl p-5 sm:p-10 premium-card"
           style={{
-            backgroundColor: "var(--surface)",
-            borderColor: "var(--border)",
-            boxShadow: "var(--shadow-elevated)",
+            backgroundColor: "white",
+            boxShadow: premiumShadow,
           }}
           {...fadeUp(0.15)}
         >

@@ -111,7 +111,14 @@ const cardShadow =
   "0 2px 12px rgba(28, 24, 20, 0.07), 0 0 0 1px rgba(28, 24, 20, 0.04)";
 
 const inputClass =
-  "w-full px-4 py-3 rounded-lg border border-[#E2D9CF] bg-white text-sm text-[#1C1814] placeholder:text-[#9C8C7A] focus:outline-none focus:ring-2 focus:ring-[#E85D1A]/30 focus:border-[#E85D1A] transition-all duration-150";
+  "w-full px-4 py-3 rounded-xl border border-[#E2D9CF] bg-white text-sm text-[#1C1814] placeholder:text-[#9C8C7A] focus:outline-none focus:ring-2 focus:ring-[#E85D1A]/30 focus:border-[#E85D1A] transition-all duration-150";
+
+const TIER_GRADIENTS: Record<string, string> = {
+  Basic: "linear-gradient(135deg, #9C8C7A, #C4B5A5)",
+  Standard: "linear-gradient(135deg, #E85D1A, #F07030)",
+  Pro: "linear-gradient(135deg, #16A34A, #22C55E)",
+  Surge: "linear-gradient(135deg, #1C1814, #374151)",
+};
 
 /* ─── Fade-Up Animation ─── */
 const fadeUp = {
@@ -467,7 +474,7 @@ export default function CalculatorPage() {
 
         {/* ─── Form Card ─── */}
         <motion.div
-          className="bg-white rounded-xl p-6"
+          className="bg-white rounded-2xl p-6 stat-card"
           style={{ boxShadow: cardShadow }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -771,259 +778,112 @@ export default function CalculatorPage() {
               transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             >
               {/* ── Risk Score Card ── */}
-              <div
-                className="bg-white rounded-xl p-6"
-                style={{ boxShadow: cardShadow }}
-              >
+              <div className="bg-white rounded-2xl p-6 stat-card" style={{ boxShadow: cardShadow }}>
+                {/* Top accent */}
+                <div className="absolute top-0 left-0 right-0 h-0.5 rounded-t-2xl"
+                  style={{ background: `linear-gradient(to right, ${getScoreColor(score)}, transparent)` }} />
                 <div className="flex items-center justify-between mb-5">
-                  <span
-                    className="text-xs font-medium"
-                    style={{
-                      color: "var(--muted)",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.75rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
+                  <span className="text-xs font-medium" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Your Risk Score
                   </span>
-                  <span
-                    className="px-2.5 py-1 rounded-full text-xs font-medium"
-                    style={{
-                      background:
-                        score < 35
-                          ? "var(--accent-light)"
-                          : score < 70
-                          ? "var(--amber-light)"
-                          : "#FEE2E2",
-                      color: getScoreColor(score),
-                      fontFamily: "var(--font-mono)",
-                    }}
-                  >
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold"
+                    style={{ background: score < 35 ? "var(--accent-light)" : score < 70 ? "var(--amber-light)" : "#FEE2E2", color: getScoreColor(score), fontFamily: "var(--font-mono)" }}>
                     {getScoreLabel(score)}
                   </span>
                 </div>
-
-                {/* Score number */}
                 <div className="flex items-end gap-2 mb-4">
                   <motion.span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "1.5rem",
-                      fontWeight: 500,
-                      color: getScoreColor(score),
-                      lineHeight: 1,
-                    }}
+                    style={{ fontFamily: "var(--font-mono)", fontSize: "2.5rem", fontWeight: 700, color: getScoreColor(score), lineHeight: 1 }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 }}
                   >
                     {score}
                   </motion.span>
-                  <span
-                    className="mb-0.5"
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.875rem",
-                      color: "var(--muted)",
-                    }}
-                  >
-                    / 100 — {getScoreLabel(score)}
+                  <span className="mb-1" style={{ fontFamily: "var(--font-mono)", fontSize: "0.875rem", color: "var(--muted)" }}>
+                    / 100
                   </span>
                 </div>
-
-                {/* Gradient bar */}
                 <RiskGradientBar score={score} />
               </div>
 
               {/* ── Contributing Factors Card ── */}
-              <div
-                className="bg-white rounded-xl p-6"
-                style={{ boxShadow: cardShadow }}
-              >
-                <h3
-                  className="mb-5"
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: "1.25rem",
-                    color: "var(--foreground)",
-                    letterSpacing: "-0.015em",
-                  }}
-                >
+              <div className="bg-white rounded-2xl p-6 stat-card" style={{ boxShadow: cardShadow }}>
+                <h3 className="mb-5" style={{ fontFamily: "var(--font-display)", fontSize: "1.25rem", color: "var(--foreground)", letterSpacing: "-0.015em" }}>
                   What&apos;s driving your score
                 </h3>
-
                 <div className="space-y-5">
                   {CONTRIBUTING_FACTORS.map((factor, i) => (
-                    <FactorBar
-                      key={factor.label}
-                      factor={factor}
-                      index={i}
-                      score={score}
-                      weeksClean={weeksClean}
-                    />
+                    <FactorBar key={factor.label} factor={factor} index={i} score={score} weeksClean={weeksClean} />
                   ))}
                 </div>
               </div>
 
               {/* ── Premium Output Card ── */}
               <motion.div
-                className="rounded-xl p-6 relative overflow-hidden"
-                style={{
-                  boxShadow: cardShadow,
-                  background: "white",
-                }}
+                className="rounded-2xl overflow-hidden relative"
+                style={{ boxShadow: "0 8px 40px rgba(232,93,26,0.15), 0 0 0 1px rgba(232,93,26,0.1)" }}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.5 }}
               >
-                {/* Decorative gradient strip */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-1"
-                  style={{
-                    background: `linear-gradient(90deg, ${getTierColor(
-                      premium.tier
-                    )}, ${getTierColor(premium.tier)}88)`,
-                  }}
-                />
-
-                <div className="flex items-start justify-between mb-5">
-                  <div>
-                    <span
-                      className="text-xs font-medium block mb-1"
-                      style={{
-                        color: "var(--muted)",
-                        fontFamily: "var(--font-mono)",
-                        fontSize: "0.75rem",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Recommended Plan
-                    </span>
-                    <span
-                      className="px-3 py-1.5 rounded-lg text-sm font-semibold inline-block"
-                      style={{
-                        background: `${getTierColor(premium.tier)}15`,
-                        color: getTierColor(premium.tier),
-                        fontFamily: "var(--font-body)",
-                        border: `1.5px solid ${getTierColor(premium.tier)}30`,
-                      }}
-                    >
-                      {premium.tier}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span
-                      className="text-xs block mb-1"
-                      style={{
-                        color: "var(--muted)",
-                        fontFamily: "var(--font-mono)",
-                        fontSize: "0.6875rem",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      Max Coverage
-                    </span>
-                    <span
-                      className="text-lg font-medium"
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: "1.25rem",
-                        color: "var(--foreground)",
-                        fontWeight: 500,
-                      }}
-                    >
-                      ₹{premium.coverage.toLocaleString()}
-                    </span>
+                {/* Gradient Header */}
+                <div className="relative p-6 pb-8"
+                  style={{ background: TIER_GRADIENTS[premium.tier] ?? "linear-gradient(135deg, #E85D1A, #F07030)" }}>
+                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 80% 20%, white, transparent 60%)" }} />
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-white/70 text-xs font-medium uppercase tracking-widest" style={{ fontFamily: "var(--font-mono)" }}>
+                        Recommended Plan
+                      </span>
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white border border-white/30">
+                        {premium.tier}
+                      </span>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: "3rem", fontWeight: 700, color: "white", lineHeight: 1, letterSpacing: "-0.03em" }}>
+                        ₹{premium.premium}
+                      </span>
+                      <span className="mb-2 text-white/60" style={{ fontFamily: "var(--font-mono)", fontSize: "0.875rem" }}>/week</span>
+                    </div>
+                    {premium.hasDiscount && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-sm line-through text-white/50" style={{ fontFamily: "var(--font-mono)" }}>₹{premium.originalPremium}/wk</span>
+                        <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-white/20 text-white border border-white/20">
+                          🔥 −10% streak bonus
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Premium amount */}
-                <div className="flex items-end gap-2 mb-2">
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "2.5rem",
-                      fontWeight: 500,
-                      color: "#E85D1A",
-                      lineHeight: 1,
-                      letterSpacing: "-0.02em",
-                    }}
-                  >
-                    ₹{premium.premium}
-                  </span>
-                  <span
-                    className="mb-1.5"
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "0.875rem",
-                      color: "var(--muted)",
-                    }}
-                  >
-                    /week
-                  </span>
-                </div>
-
-                {/* Discount indicator */}
-                {premium.hasDiscount && (
-                  <div className="flex items-center gap-2 mb-6">
-                    <span
-                      className="text-sm line-through"
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--muted)",
-                        fontSize: "0.875rem",
-                      }}
-                    >
-                      ₹{premium.originalPremium}/week
-                    </span>
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full font-medium"
-                      style={{
-                        background: "var(--accent-light)",
-                        color: "var(--accent)",
-                        fontFamily: "var(--font-body)",
-                      }}
-                    >
-                      -10% clean streak discount
-                    </span>
+                {/* Details Body */}
+                <div className="bg-white p-6 space-y-4">
+                  <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}>
+                    <div>
+                      <p className="text-xs mb-0.5" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.6875rem" }}>Max Coverage</p>
+                      <p className="text-xl font-bold" style={{ fontFamily: "var(--font-mono)", color: "var(--foreground)" }}>₹{premium.coverage.toLocaleString()}</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center icon-chip-orange">
+                      <Shield size={18} />
+                    </div>
                   </div>
-                )}
 
-                {!premium.hasDiscount && <div className="mb-6" />}
-
-                {/* CTA */}
-                <motion.button
-                  onClick={() =>
-                    router.push("/onboarding")
-                  }
-                  className="w-full py-3.5 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 transition-all duration-150"
-                  style={{
-                    background: "var(--primary)",
-                    boxShadow: "0 2px 8px rgba(232,93,26,0.35)",
-                    fontFamily: "var(--font-body)",
-                    cursor: "pointer",
-                  }}
-                  whileHover={{ boxShadow: "0 4px 16px rgba(232,93,26,0.45)" }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Activate This Plan
-                  <ArrowRight size={16} />
-                </motion.button>
-
-                <p
-                  className="text-center text-xs mt-3"
-                  style={{
-                    color: "var(--muted)",
-                    fontFamily: "var(--font-body)",
-                    fontSize: "0.75rem",
-                  }}
-                >
-                  Premium auto-deducted weekly. Cancel anytime.
-                </p>
+                  {/* CTA */}
+                  <motion.button
+                    onClick={() => router.push("/onboarding")}
+                    className="w-full py-4 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 btn-shimmer"
+                    style={{ background: "linear-gradient(135deg,#E85D1A,#F07030)", boxShadow: "0 4px 18px rgba(232,93,26,0.35)", fontFamily: "var(--font-body)", cursor: "pointer", border: "none" }}
+                    whileHover={{ scale: 1.01, boxShadow: "0 6px 24px rgba(232,93,26,0.45)" }}
+                    whileTap={{ scale: 0.99 }}
+                  >
+                    Activate This Plan
+                    <ArrowRight size={16} />
+                  </motion.button>
+                  <p className="text-center text-xs" style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}>
+                    Premium auto-deducted weekly. Cancel anytime.
+                  </p>
+                </div>
               </motion.div>
             </motion.div>
           )}

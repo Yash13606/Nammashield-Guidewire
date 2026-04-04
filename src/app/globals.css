@@ -42,6 +42,8 @@
   --radius-lg:      20px;
   --shadow-card:    0 2px 12px rgba(28, 24, 20, 0.07), 0 0 0 1px rgba(28, 24, 20, 0.04);
   --shadow-elevated: 0 8px 32px rgba(28, 24, 20, 0.12);
+  --shadow-premium:  0 4px 24px rgba(232, 93, 26, 0.12), 0 0 0 1px rgba(232, 93, 26, 0.06);
+  --shadow-glass:    0 8px 32px rgba(28, 24, 20, 0.08), 0 0 0 1px rgba(28, 24, 20, 0.04);
 
   /* Landing page aliases */
   --bg:             #F7F3EE;
@@ -67,7 +69,9 @@
   }
 }
 
-/* Typography Scale */
+/* ─────────────────────────────────────────
+   Typography Scale
+───────────────────────────────────────── */
 .text-display-xl  { font-family: var(--font-display); font-size: 3rem; line-height: 1.05; letter-spacing: -0.03em; }
 .text-display-lg  { font-family: var(--font-display); font-size: 2.25rem; line-height: 1.1; letter-spacing: -0.025em; }
 .text-display-md  { font-family: var(--font-display); font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.02em; }
@@ -81,7 +85,188 @@
 .text-mono     { font-family: var(--font-mono); font-size: 0.875rem; font-weight: 400; letter-spacing: 0.02em; }
 .text-mono-xs   { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 400; letter-spacing: 0.02em; }
 
-/* Scrollbar Styling */
+/* ─────────────────────────────────────────
+   Premium Card Utilities
+───────────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 217, 207, 0.6);
+  box-shadow: var(--shadow-glass);
+}
+
+.premium-card {
+  background: white;
+  border: 1px solid rgba(232, 93, 26, 0.08);
+  box-shadow: var(--shadow-premium);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.premium-card:hover {
+  box-shadow: 0 8px 40px rgba(232, 93, 26, 0.15), 0 0 0 1px rgba(232, 93, 26, 0.10);
+  transform: translateY(-1px);
+}
+
+.stat-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease, transform 0.18s ease;
+  overflow: hidden;
+  position: relative;
+}
+.stat-card:hover {
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-2px);
+}
+
+/* ─────────────────────────────────────────
+   Gradient Text
+───────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #E85D1A 0%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-green {
+  background: linear-gradient(135deg, #16A34A 0%, #22C55E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─────────────────────────────────────────
+   Keyframe Animations
+───────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 93, 26, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(232, 93, 26, 0.12); }
+}
+
+@keyframes pulse-glow-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.15); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.85; }
+}
+
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(44px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(44px) rotate(-360deg); }
+}
+
+@keyframes orbit-slow {
+  from { transform: rotate(180deg) translateX(60px) rotate(-180deg); }
+  to { transform: rotate(540deg) translateX(60px) rotate(-540deg); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes status-ping {
+  0% { transform: scale(1); opacity: 1; }
+  75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-pulse-glow { animation: pulse-glow 2.5s ease-in-out infinite; }
+.animate-pulse-glow-green { animation: pulse-glow-green 2.5s ease-in-out infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-breathe { animation: breathe 3s ease-in-out infinite; }
+.animate-orbit { animation: orbit 6s linear infinite; }
+.animate-orbit-slow { animation: orbit-slow 10s linear infinite; }
+.animate-status-ping { animation: status-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+/* ─────────────────────────────────────────
+   Shimmer Button Effect
+───────────────────────────────────────── */
+.btn-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 70%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  transition: left 0.6s ease;
+}
+.btn-shimmer:hover::after {
+  left: 130%;
+}
+
+/* ─────────────────────────────────────────
+   Icon Chip Variants
+───────────────────────────────────────── */
+.icon-chip-orange {
+  background: linear-gradient(135deg, #FDE8DA, #FECBA3);
+  color: #E85D1A;
+  border: 1px solid rgba(232, 93, 26, 0.2);
+}
+.icon-chip-green {
+  background: linear-gradient(135deg, #DCFCE7, #BBF7D0);
+  color: #16A34A;
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+.icon-chip-amber {
+  background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+  color: #D97706;
+  border: 1px solid rgba(217, 119, 6, 0.2);
+}
+.icon-chip-blue {
+  background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
+  color: #2563EB;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+}
+.icon-chip-purple {
+  background: linear-gradient(135deg, #EDE9FE, #DDD6FE);
+  color: #7C3AED;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+}
+.icon-chip-red {
+  background: linear-gradient(135deg, #FEE2E2, #FECACA);
+  color: #DC2626;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+/* ─────────────────────────────────────────
+   Left Border Accent Cards (Claims timeline)
+───────────────────────────────────────── */
+.claim-card-rain    { border-left: 3px solid #3B82F6; }
+.claim-card-heat    { border-left: 3px solid #E85D1A; }
+.claim-card-aqi     { border-left: 3px solid #7C3AED; }
+.claim-card-shutdown { border-left: 3px solid #DC2626; }
+.claim-card-default { border-left: 3px solid var(--border); }
+
+/* ─────────────────────────────────────────
+   Scrollbar Styling
+───────────────────────────────────────── */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -96,7 +281,9 @@
   background: var(--muted);
 }
 
-/* OTP Input */
+/* ─────────────────────────────────────────
+   OTP Input
+───────────────────────────────────────── */
 .otp-input {
   width: 48px;
   height: 56px;
@@ -115,7 +302,48 @@
   box-shadow: 0 0 0 3px rgba(232, 93, 26, 0.15);
 }
 
-/* Grain texture overlay */
+/* ─────────────────────────────────────────
+   Grain Texture Overlay
+───────────────────────────────────────── */
 .grain-overlay {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+/* ─────────────────────────────────────────
+   Recharts Tooltip Override
+───────────────────────────────────────── */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  border-radius: 10px !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-card) !important;
+  font-family: var(--font-body) !important;
+  font-size: 0.8125rem !important;
+}
+
+/* ─────────────────────────────────────────
+   Sidebar Nav Active Indicator
+───────────────────────────────────────── */
+.sidebar-nav-active {
+  background: linear-gradient(135deg, #FDE8DA 0%, #FEF0E7 100%);
+  color: #1C1814;
+  font-weight: 600;
+}
+
+/* ─────────────────────────────────────────
+   Live Pulse Dot
+───────────────────────────────────────── */
+.live-dot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.live-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  animation: status-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
 }

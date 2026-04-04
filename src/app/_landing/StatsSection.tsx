@@ -97,16 +97,30 @@ function StatItem({
   );
 }
 
+/* ─── Grain Overlay ─── */
+function GrainOverlay() {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none opacity-[0.06]"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,
+        backgroundSize: "128px 128px",
+      }}
+    />
+  );
+}
+
 export default function StatsSection() {
   return (
     <section
-      className="py-16 md:py-24 px-6"
+      className="py-20 md:py-32 px-6 relative overflow-hidden"
       style={{ backgroundColor: "var(--primary)" }}
     >
-      <div className="max-w-5xl mx-auto">
+      <GrainOverlay />
+      <div className="max-w-6xl mx-auto relative z-10">
         {/* Stats row */}
         <motion.div
-          className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-0 justify-items-center"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-0 justify-items-center"
           {...fadeUp(0)}
         >
           {stats.map((stat, i) => (
@@ -116,15 +130,16 @@ export default function StatsSection() {
 
         {/* Tagline */}
         <motion.p
-          className="mt-12 md:mt-16 text-center text-[18px] md:text-[22px]"
+          className="mt-16 md:mt-24 text-center text-xl md:text-2xl leading-relaxed max-w-2xl mx-auto"
           style={{
             fontFamily: "var(--font-serif)",
             fontStyle: "italic",
-            color: "rgba(255,255,255,0.85)",
+            color: "rgba(255,255,255,0.9)",
+            opacity: 0.8,
           }}
           {...fadeUp(0.3)}
         >
-          We don&apos;t insure accidents. We insure effort.
+          &ldquo;We don&apos;t just insure accidents. We insure effort.&rdquo;
         </motion.p>
       </div>
     </section>

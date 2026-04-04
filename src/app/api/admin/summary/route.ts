@@ -32,16 +32,15 @@ export async function GET() {
 
     const { data: payouts } = await supabaseAdmin
       .from("payout_log")
-      .select("amount")
-      .gte("processed_at", weekAgo.toISOString());
+      .select("amount");
 
-    const weeklyPayouts = (payouts ?? []).reduce(
+    const totalPayouts = (payouts ?? []).reduce(
       (s, r) => s + Number(r.amount),
       0
     );
 
     const lossRatio =
-      weeklyPremiums > 0 ? (weeklyPayouts / weeklyPremiums) * 100 : 0;
+      weeklyPremiums > 0 ? (totalPayouts / weeklyPremiums) * 100 : 0;
 
     const { data: recentTriggers } = await supabaseAdmin
       .from("trigger_events")
@@ -73,7 +72,7 @@ export async function GET() {
       activeWorkers: activeWorkers ?? 0,
       activePolicies: activePolicies ?? 0,
       weeklyPremiums,
-      weeklyPayouts,
+      totalPayouts,
       lossRatio: Math.round(lossRatio * 10) / 10,
       recentTriggers: triggersWithCounts,
       triggerFrequency: Object.entries(freqMap).map(([name, value]) => ({

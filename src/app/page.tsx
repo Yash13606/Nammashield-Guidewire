@@ -4,23 +4,36 @@ import { useState, useEffect, useRef } from "react";
 import WhisperText from "@/components/ui/whisper-text";
 import { motion, useScroll, useTransform } from "framer-motion";
 import {
+  Menu,
+  ChevronRight,
+  ShieldCheck,
+  Zap,
+  Clock,
+  ArrowRight,
+  Play,
+  Pause,
+  RefreshCw,
+  TrendingUp,
+  MapPin,
+  Check,
+  Plus,
+  Info,
   Shield,
+  ArrowUpRight,
+  X,
   ChevronDown,
   CloudRain,
   Thermometer,
   Wind,
   Ban,
-  Zap,
   Smartphone,
   Banknote,
-  ShieldCheck,
   Bot,
   Lock,
-  ArrowRight,
-  Menu,
-  X,
 } from "lucide-react";
+import { Logo } from "@/components/namma/Logo";
 import { useAppStore } from "@/lib/navigationStore";
+import { useAuthStore } from "@/lib/authStore";
 import { useRouter } from "next/navigation";
 import StatsSection from "./_landing/StatsSection";
 import SimulatorSection from "./_landing/SimulatorSection";
@@ -116,7 +129,7 @@ function Navbar() {
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 md:py-5 flex justify-between items-center">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
-            <Shield size={22} style={{ color: "var(--primary)" }} />
+            <Logo size={24} />
             <span
               className="tracking-tight"
               style={{
@@ -320,26 +333,35 @@ function HeroSection() {
         >
           <button
             onClick={() => router.push(isOnboarded ? "/dashboard" : "/onboarding")}
-            className="px-10 py-4 rounded-full text-white font-semibold text-base transition-all duration-200 cursor-pointer"
+            className="px-8 py-4 rounded-full text-white font-semibold text-base transition-all duration-200 cursor-pointer"
             style={{
               fontFamily: "var(--font-body)",
               background: "var(--primary)",
               border: "none",
-              boxShadow: "0 4px 24px rgba(232,93,26,0.4), 0 0 0 0 rgba(232,93,26,0)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow =
-                "0 6px 32px rgba(232,93,26,0.55), 0 0 0 4px rgba(232,93,26,0.1)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow =
-                "0 4px 24px rgba(232,93,26,0.4), 0 0 0 0 rgba(232,93,26,0)";
-              e.currentTarget.style.transform = "translateY(0)";
+              boxShadow: "0 4px 24px rgba(232,93,26,0.4)",
             }}
           >
-            {isOnboarded ? "Go to Dashboard" : "Start Free This Week — ₹50"}
+            {isOnboarded ? "Go to Dashboard" : "Start Free This Week"}
           </button>
+
+          {!isOnboarded && (
+            <button
+              onClick={async () => {
+                const { loginAsDemo } = useAuthStore.getState();
+                await loginAsDemo();
+                router.push("/dashboard");
+              }}
+              className="px-8 py-4 rounded-full font-semibold text-base transition-all duration-200 cursor-pointer border backdrop-blur-md"
+              style={{
+                fontFamily: "var(--font-body)",
+                background: "rgba(255, 255, 255, 0.4)",
+                borderColor: "var(--border)",
+                color: "var(--foreground)",
+              }}
+            >
+              Try Demo Experience
+            </button>
+          )}
         </motion.div>
 
         {/* Social proof strip */}

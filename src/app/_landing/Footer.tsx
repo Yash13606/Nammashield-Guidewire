@@ -1,6 +1,6 @@
 "use client";
 
-import { Shield } from "lucide-react";
+import { Logo } from "@/components/namma/Logo";
 
 const footerLinks = [
   { label: "Privacy", href: "#" },
@@ -21,10 +21,9 @@ export default function Footer() {
           {/* Left: Logo + tagline */}
           <div className="flex items-start gap-3">
             <div
-              className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0"
-              style={{ backgroundColor: "var(--primary)" }}
+              className="flex items-center justify-center rounded-xl shrink-0"
             >
-              <Shield size={18} color="#fff" />
+              <Logo size={40} />
             </div>
             <div>
               <p

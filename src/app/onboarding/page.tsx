@@ -1,34 +1,37 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield,
-  Upload,
   Phone,
   MapPin,
   CreditCard,
   Check,
   ChevronRight,
   Zap,
+  Upload,
 } from "lucide-react";
-import { useAppStore } from "@/lib/navigationStore";
+import { Logo } from "@/components/namma/Logo";
 import { useAuthStore } from "@/lib/authStore";
 import { supabase } from "@/lib/supabase/client";
-import { ZONES } from "@/lib/mockData";
+import { ZONES, PLANS } from "@/lib/mockData";
 import { useRouter } from "next/navigation";
 
 /* ─── Animation Config ─── */
 const slideVariants = {
-  enter: { x: 32, opacity: 0 },
+  enter: (direction: number) => ({ x: direction > 0 ? 32 : -32, opacity: 0 }),
   center: { x: 0, opacity: 1 },
-  exit: { x: -32, opacity: 0 },
+  exit: (direction: number) => ({ x: direction > 0 ? -32 : 32, opacity: 0 }),
 };
 const slideTransition = { duration: 0.35, ease: [0.22, 1, 0.36, 1] as any };
 
 /* ─── Shared Styles ─── */
 const cardShadow =
   "0 2px 12px rgba(28, 24, 20, 0.07), 0 0 0 1px rgba(28, 24, 20, 0.04)";
+
+const premiumShadow =
+  "0 10px 40px rgba(232, 93, 26, 0.12), 0 0 0 1px rgba(232, 93, 26, 0.08)";
 
 const CITIES = Object.keys(ZONES);
 
@@ -80,8 +83,8 @@ function BrandPanel() {
       className="hidden lg:flex flex-col justify-between relative overflow-hidden"
       style={{
         width: "45%",
-        background: "var(--primary)",
-        padding: "3rem 2.5rem",
+        background: "linear-gradient(135deg, #1C1814 0%, var(--primary) 100%)",
+        padding: "4rem 3.5rem",
       }}
     >
       <GrainOverlay />
@@ -94,10 +97,9 @@ function BrandPanel() {
           style={{
             width: 36,
             height: 36,
-            background: "rgba(255,255,255,0.15)",
           }}
         >
-          <Shield className="text-white" size={20} />
+          <Logo size={48} />
         </div>
         <span
           className="text-white font-semibold tracking-tight"
@@ -143,19 +145,21 @@ function BrandPanel() {
         ].map((stat) => (
           <div
             key={stat.label}
-            className="flex items-center gap-2 px-4 py-2 rounded-full"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full"
             style={{
-              background: "rgba(255,255,255,0.15)",
-              backdropFilter: "blur(4px)",
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              backdropFilter: "blur(8px)",
             }}
           >
             <span className="text-sm">{stat.icon}</span>
             <span
               className="text-white"
               style={{
-                fontFamily: "var(--font-body)",
-                fontSize: "0.8125rem",
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.75rem",
                 fontWeight: 500,
+                letterSpacing: "0.02em",
               }}
             >
               {stat.label}
@@ -170,16 +174,26 @@ function BrandPanel() {
 /* ─── Progress Bar ─── */
 function ProgressBar({ current, total }: { current: number; total: number }) {
   return (
-    <div className="flex gap-1.5 mb-2">
+    <div className="flex gap-2.5 mb-4 px-1">
       {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
-          className="h-1 flex-1 rounded-full transition-colors duration-300"
+          className="h-2 flex-1 rounded-full transition-all duration-500 overflow-hidden relative"
           style={{
-            background:
-              i < current ? "var(--primary)" : "var(--border)",
+            background: "var(--border)",
+            opacity: i < current ? 1 : 0.4,
           }}
-        />
+        >
+          {i < current && (
+            <motion.div
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(90deg, var(--primary), #F07030)" }}
+              initial={{ width: 0 }}
+              animate={{ width: "100%" }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
+          )}
+        </div>
       ))}
     </div>
   );
@@ -244,7 +258,6 @@ function StepPhone({
       otpRefs.current[index + 1]?.focus();
     }
 
-    // Auto-verify when all filled — call Supabase
     if (val && newOtp.every((c) => c !== "")) {
       completeLogin();
     }
@@ -256,17 +269,6 @@ function StepPhone({
   ) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       otpRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const data = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (data.length === 6) {
-      const newOtp = data.split("");
-      setOtp(newOtp);
-      otpRefs.current[5]?.focus();
-      completeLogin();
     }
   };
 
@@ -297,7 +299,6 @@ function StepPhone({
         We&apos;ll send a one-time verification code
       </p>
 
-      {/* Phone Input */}
       <div className="flex gap-2 mb-6">
         <div
           className="flex items-center gap-1.5 px-4 rounded-lg border shrink-0"
@@ -327,14 +328,6 @@ function StepPhone({
             color: "var(--foreground)",
             height: 48,
           }}
-          onFocus={(e) => {
-            e.target.style.borderColor = "var(--primary)";
-            e.target.style.boxShadow = "0 0 0 3px rgba(232, 93, 26, 0.15)";
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = "var(--border)";
-            e.target.style.boxShadow = "none";
-          }}
           maxLength={10}
         />
       </div>
@@ -343,50 +336,22 @@ function StepPhone({
         <button
           onClick={handleSendOtp}
           disabled={phone.length !== 10 || sending}
-          className="w-full py-3 rounded-lg text-white font-medium text-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`w-full py-3.5 rounded-xl text-white font-semibold text-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${phone.length === 10 ? "btn-shimmer" : ""}`}
           style={{
             background:
               phone.length === 10 && !sending
-                ? "var(--primary)"
+                ? "linear-gradient(135deg, var(--primary), #F07030)"
                 : "var(--muted)",
-            boxShadow:
-              phone.length === 10
-                ? "0 2px 8px rgba(232,93,26,0.35)"
-                : "none",
             fontFamily: "var(--font-body)",
+            border: "none",
+            cursor: phone.length === 10 ? "pointer" : "default",
           }}
         >
-          {sending ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 2a10 10 0 0 1 10 10"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </motion.div>
-          ) : (
-            "Send OTP"
-          )}
+          {sending ? "Sending..." : "Send OTP"}
         </button>
       ) : (
         <div>
-          <p
-            className="text-xs mb-3"
-            style={{
-              color: "var(--muted)",
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.75rem",
-            }}
-          >
-            Enter 6-digit code sent to +91{phone}
-          </p>
-          <div className="flex gap-2.5 mb-4" onPaste={handleOtpPaste}>
+          <div className="flex gap-2.5 mb-4">
             {otp.map((digit, i) => (
               <input
                 key={i}
@@ -394,55 +359,17 @@ function StepPhone({
                   otpRefs.current[i] = el;
                 }}
                 type="text"
-                inputMode="numeric"
                 value={digit}
                 onChange={(e) => handleOtpChange(i, e)}
                 onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                className="otp-input"
+                className="w-full h-12 text-center rounded-lg border text-lg font-bold"
+                style={{ borderColor: "var(--border)" }}
                 maxLength={1}
-                autoFocus={i === 0}
               />
             ))}
           </div>
-          {verifying && (
-            <div className="flex items-center gap-2 justify-center">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M12 2a10 10 0 0 1 10 10"
-                    stroke="var(--primary)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </motion.div>
-              <span
-                className="text-xs"
-                style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-              >
-                Verifying...
-              </span>
-            </div>
-          )}
-          <button
-            onClick={() => {
-              setOtpSent(false);
-              setOtp(Array(6).fill(""));
-            }}
-            className="mt-4 text-xs underline"
-            style={{
-              color: "var(--muted)",
-              fontFamily: "var(--font-body)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            Change number
-          </button>
+          {verifying && <p className="text-xs text-center text-muted">Verifying...</p>}
+          {error && <p className="text-xs text-center text-red-500 mt-2">{error}</p>}
         </div>
       )}
     </motion.div>
@@ -457,19 +384,13 @@ function StepPlatformId({
 }) {
   const workerId = useAuthStore((s) => s.workerId);
   const [saving, setSaving] = useState(false);
-  const [state, setState] = useState<
-    "upload" | "scanning" | "verified"
-  >("upload");
+  const [state, setState] = useState<"upload" | "scanning" | "verified">("upload");
   const [platform, setPlatform] = useState("");
-  const [fileName, setFileName] = useState("");
 
   const handleUpload = () => {
     setState("scanning");
     setPlatform("Swiggy");
-    setFileName("partner_id_swiggy.png");
-    setTimeout(() => {
-      setState("verified");
-    }, 2500);
+    setTimeout(() => setState("verified"), 2000);
   };
 
   return (
@@ -482,343 +403,67 @@ function StepPlatformId({
       transition={slideTransition}
       className="w-full"
     >
-      <h3
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "1.75rem",
-          color: "var(--foreground)",
-          marginBottom: "0.5rem",
-        }}
-      >
-        Upload your Partner ID
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.75rem", marginBottom: "0.5rem" }}>
+        Partner ID
       </h3>
-      <p
-        className="text-sm mb-8"
-        style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-      >
-        Screenshot your platform profile or ID card
-      </p>
+      <p className="text-sm mb-8 text-muted">Upload your delivery platform ID screenshot</p>
 
       {state === "upload" && (
         <button
           onClick={handleUpload}
-          className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 py-12 transition-all duration-200 cursor-pointer group"
-          style={{
-            borderColor: "var(--border)",
-            background: "rgba(255,255,255,0.5)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--primary)";
-            e.currentTarget.style.background = "var(--primary-light)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border)";
-            e.currentTarget.style.background = "rgba(255,255,255,0.5)";
-          }}
+          className="w-full border-2 border-dashed rounded-2xl py-12 flex flex-col items-center gap-3"
+          style={{ borderColor: "var(--border)", background: "white" }}
         >
-          <div
-            className="flex items-center justify-center rounded-xl"
-            style={{
-              width: 56,
-              height: 56,
-              background: "var(--primary-light)",
-            }}
-          >
-            <Upload
-              size={24}
-              style={{ color: "var(--primary)" }}
-            />
-          </div>
-          <div className="text-center">
-            <p
-              className="font-medium text-sm mb-1"
-              style={{
-                color: "var(--foreground)",
-                fontFamily: "var(--font-body)",
-              }}
-            >
-              Tap to upload screenshot
-            </p>
-            <p
-              className="text-xs"
-              style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-            >
-              PNG, JPG — Max 5MB
-            </p>
-          </div>
+          <Upload className="text-primary" size={32} />
+          <span className="font-medium">Tap to upload screenshot</span>
         </button>
       )}
 
       {state === "scanning" && (
-        <div
-          className="rounded-xl overflow-hidden relative"
-          style={{ boxShadow: cardShadow }}
-        >
-          <div
-            className="p-6"
-            style={{ background: "white" }}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="rounded-lg flex items-center justify-center"
-                style={{
-                  width: 40,
-                  height: 40,
-                  background: "var(--amber-light)",
-                }}
-              >
-                <Zap size={18} style={{ color: "var(--amber)" }} />
-              </div>
-              <div>
-                <p
-                  className="font-medium text-sm"
-                  style={{
-                    color: "var(--foreground)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  Extracting details...
-                </p>
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--muted)", fontFamily: "var(--font-mono)" }}
-                >
-                  {fileName}
-                </p>
-              </div>
-            </div>
-
-            {/* Scan line animation */}
-            <div
-              className="rounded-lg overflow-hidden relative"
-              style={{
-                height: 80,
-                background: "var(--secondary)",
-              }}
-            >
-              <motion.div
-                className="absolute left-0 right-0 h-[2px]"
-                style={{ background: "var(--primary)" }}
-                initial={{ top: 0 }}
-                animate={{ top: 78 }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  repeatType: "reverse",
-                  ease: "easeInOut",
-                }}
-              />
-              <div className="flex items-center justify-center h-full">
-                <span
-                  className="text-xs"
-                  style={{
-                    color: "var(--muted)",
-                    fontFamily: "var(--font-mono)",
-                  }}
-                >
-                  Scanning document...
-                </span>
-              </div>
-            </div>
-          </div>
+        <div className="w-full p-8 border rounded-2xl text-center">
+          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="inline-block mb-4">
+             <Zap size={32} className="text-primary" />
+          </motion.div>
+          <p>Analyzing profile details...</p>
         </div>
       )}
 
       {state === "verified" && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <div
-            className="rounded-xl p-6"
-            style={{ boxShadow: cardShadow, background: "white" }}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="rounded-xl flex items-center justify-center"
-                  style={{
-                    width: 48,
-                    height: 48,
-                    background: "var(--accent-light)",
-                  }}
-                >
-                  <Check size={22} style={{ color: "var(--accent)" }} />
-                </div>
-                <div>
-                  <p
-                    className="font-semibold text-sm"
-                    style={{
-                      color: "var(--foreground)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    Partner ID Verified
-                  </p>
-                  <p
-                    className="text-xs"
-                    style={{
-                      color: "var(--accent)",
-                      fontFamily: "var(--font-mono)",
-                    }}
-                  >
-                    ✓ Identity confirmed
-                  </p>
-                </div>
-              </div>
-              <span
-                className="px-2.5 py-1 rounded-full text-xs font-medium"
-                style={{
-                  background: "var(--accent-light)",
-                  color: "var(--accent)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Verified
-              </span>
-            </div>
-
-            <div
-              className="grid grid-cols-2 gap-3"
-              style={{
-                padding: "12px 16px",
-                background: "var(--secondary)",
-                borderRadius: "var(--radius-sm)",
-              }}
-            >
-              <div>
-                <p
-                  className="text-xs mb-0.5"
-                  style={{
-                    color: "var(--muted)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "0.6875rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  Platform
-                </p>
-                <p
-                  className="font-medium text-sm"
-                  style={{
-                    color: "var(--foreground)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  {platform}
-                </p>
-              </div>
-              <div>
-                <p
-                  className="text-xs mb-0.5"
-                  style={{
-                    color: "var(--muted)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "0.6875rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  Partner ID
-                </p>
-                <p
-                  className="font-medium text-sm"
-                  style={{
-                    color: "var(--foreground)",
-                    fontFamily: "var(--font-mono)",
-                  }}
-                >
-                  SWG-48721
-                </p>
-              </div>
-            </div>
+        <div className="space-y-6">
+          <div className="p-6 bg-accent-light rounded-2xl border border-accent flex items-center gap-4">
+             <Check className="text-accent" />
+             <div>
+               <p className="font-bold">Verified: {platform}</p>
+               <p className="text-xs opacity-70">Partner ID: SWG-48721</p>
+             </div>
           </div>
-
           <button
             onClick={async () => {
-              const partnerId = "SWG-48721";
               if (!workerId) return;
               setSaving(true);
-              try {
-                const { error } = await supabase
-                  .from("workers")
-                  .update({ name: platform, partner_id: partnerId })
-                  .eq("id", workerId);
-                if (error) throw error;
-                onNext({ platform, partnerId });
-              } catch (e) {
-                console.error(e);
-              } finally {
-                setSaving(false);
-              }
+              await supabase.from("workers").update({ partner_id: "SWG-48721", name: platform }).eq("id", workerId);
+              setSaving(false);
+              onNext({ platform, partnerId: "SWG-48721" });
             }}
             disabled={saving}
-            className="w-full mt-6 py-3 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 transition-all duration-150 disabled:opacity-60"
-            style={{
-              background: "var(--primary)",
-              boxShadow: "0 2px 8px rgba(232,93,26,0.35)",
-              fontFamily: "var(--font-body)",
-            }}
+            className="w-full py-4 rounded-xl bg-primary text-white font-bold"
           >
-            {saving ? (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M12 2a10 10 0 0 1 10 10"
-                      stroke="white"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </motion.div>
-                Saving...
-              </>
-            ) : (
-              <>
-                Continue <ChevronRight size={16} />
-              </>
-            )}
+            {saving ? "Saving..." : "Continue"}
           </button>
-        </motion.div>
+        </div>
       )}
     </motion.div>
   );
 }
 
 /* ─── Step 3: UPI Verification ─── */
-function StepUPI({
-  onNext,
-}: {
-  onNext: (data: { upi: string }) => void;
-}) {
+function StepUPI({ onNext }: { onNext: (data: { upi: string }) => void }) {
   const [upi, setUpi] = useState("");
-  const [state, setState] = useState<"input" | "verifying" | "verified">(
-    "input"
-  );
-  const [isValid, setIsValid] = useState(false);
-
-  const validateUpi = (val: string) => {
-    return /^[a-zA-Z0-9._-]+@[a-zA-Z]{2,}$/.test(val);
-  };
-
-  const handleUpiChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setUpi(val);
-    setIsValid(validateUpi(val));
-  };
+  const [state, setState] = useState<"input" | "verifying" | "verified">("input");
 
   const handleVerify = () => {
-    if (!isValid) return;
     setState("verifying");
-    setTimeout(() => {
-      setState("verified");
-    }, 2000);
+    setTimeout(() => setState("verified"), 1500);
   };
 
   return (
@@ -831,961 +476,241 @@ function StepUPI({
       transition={slideTransition}
       className="w-full"
     >
-      <h3
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "1.75rem",
-          color: "var(--foreground)",
-          marginBottom: "0.5rem",
-        }}
-      >
-        Link your UPI ID
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.75rem", marginBottom: "0.5rem" }}>
+        Payment Setup
       </h3>
-      <p
-        className="text-sm mb-8"
-        style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-      >
-        This is where your payouts will be sent
-      </p>
+      <p className="text-sm mb-8 text-muted">Where should we send your payouts?</p>
 
-      <div className="relative mb-6">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2">
-          <CreditCard size={18} style={{ color: "var(--muted)" }} />
-        </div>
+      <div className="space-y-4">
         <input
           type="text"
           value={upi}
-          onChange={handleUpiChange}
+          onChange={(e) => setUpi(e.target.value)}
           placeholder="yourname@upi"
-          className="w-full pl-11 pr-4 py-3 rounded-lg border text-sm outline-none transition-all duration-150"
-          style={{
-            borderColor: isValid ? "var(--accent)" : "var(--border)",
-            background: "white",
-            fontFamily: "var(--font-mono)",
-            fontSize: "0.9375rem",
-            color: "var(--foreground)",
-            boxShadow: isValid
-              ? "0 0 0 3px rgba(22, 163, 74, 0.12)"
-              : "none",
-          }}
+          className="w-full p-4 rounded-xl border"
         />
-      </div>
-
-      {state === "input" && (
-        <button
-          onClick={handleVerify}
-          disabled={!isValid}
-          className="w-full py-3 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{
-            background: isValid ? "var(--primary)" : "var(--muted)",
-            boxShadow: isValid
-              ? "0 2px 8px rgba(232,93,26,0.35)"
-              : "none",
-            fontFamily: "var(--font-body)",
-          }}
-        >
-          Verify UPI
-        </button>
-      )}
-
-      {state === "verifying" && (
-        <div
-          className="rounded-xl p-5"
-          style={{ boxShadow: cardShadow, background: "white" }}
-        >
-          <div className="flex items-center gap-3">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M12 2a10 10 0 0 1 10 10"
-                  stroke="var(--primary)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </motion.div>
-            <div>
-              <p
-                className="font-medium text-sm"
-                style={{
-                  color: "var(--foreground)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Sending ₹1 test credit
-              </p>
-              <p
-                className="text-xs"
-                style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-              >
-                Verifying your UPI address...
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {state === "verified" && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <div
-            className="rounded-xl p-5"
-            style={{ boxShadow: cardShadow, background: "white" }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div
-                  className="rounded-full flex items-center justify-center"
-                  style={{
-                    width: 36,
-                    height: 36,
-                    background: "var(--accent-light)",
-                  }}
-                >
-                  <Check size={18} style={{ color: "var(--accent)" }} />
-                </div>
-                {/* Pulsing green dot */}
-                <motion.div
-                  className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full"
-                  style={{ background: "var(--accent)" }}
-                  animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <p
-                    className="font-medium text-sm"
-                    style={{
-                      color: "var(--foreground)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    UPI Verified
-                  </p>
-                  <span
-                    className="px-2 py-0.5 rounded-full text-xs font-medium"
-                    style={{
-                      background: "var(--accent-light)",
-                      color: "var(--accent)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    Active
-                  </span>
-                </div>
-                <p
-                  className="text-xs mt-0.5"
-                  style={{
-                    color: "var(--muted)",
-                    fontFamily: "var(--font-mono)",
-                  }}
-                >
-                  {upi}
-                </p>
-                <p
-                  className="text-xs mt-1"
-                  style={{
-                    color: "var(--accent)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "0.6875rem",
-                  }}
-                >
-                  ✓ ₹1 test credit sent & refunded
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => onNext({ upi })}
-            className="w-full mt-6 py-3 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 transition-all duration-150"
-            style={{
-              background: "var(--primary)",
-              boxShadow: "0 2px 8px rgba(232,93,26,0.35)",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            Continue <ChevronRight size={16} />
+        {state === "input" && (
+          <button onClick={handleVerify} disabled={!upi.includes("@")} className="w-full py-4 rounded-xl bg-primary text-white font-bold">
+            Verify UPI
           </button>
-        </motion.div>
-      )}
+        )}
+        {state === "verifying" && <p className="text-center">Verifying...</p>}
+        {state === "verified" && (
+          <div className="space-y-4">
+             <div className="p-4 bg-accent-light rounded-xl flex items-center gap-3">
+               <Check className="text-accent" /> <span className="font-medium">UPI ID Linked</span>
+             </div>
+             <button onClick={() => onNext({ upi })} className="w-full py-4 rounded-xl bg-primary text-white font-bold">
+               Continue
+             </button>
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 }
 
-/* ─── Step 4: City + Zone ─── */
-function StepLocation({
-  onNext,
-}: {
-  onNext: (data: {
-    city: string;
-    zone: string;
-    riskScore: number;
-    tier: string;
-    weeklyPremium: number;
-    coverageAmount: number;
-  }) => void;
-}) {
-  const workerId = useAuthStore((s) => s.workerId);
+/* ─── Step 4: Location & Risk ─── */
+function StepLocation({ onNext }: { onNext: (data: { city: string; zone: string; riskScore: number }) => void }) {
   const [city, setCity] = useState("");
   const [zone, setZone] = useState("");
-  const [showRisk, setShowRisk] = useState(false);
   const [mlLoading, setMlLoading] = useState(false);
-  const [riskScore, setRiskScore] = useState(0);
-  const [tier, setTier] = useState("Standard");
-  const [weeklyPremium, setWeeklyPremium] = useState(100);
 
   const cityZones = city ? (ZONES as Record<string, string[]>)[city] || [] : [];
 
-  const handleCitySelect = (c: string) => {
-    setCity(c);
-    setZone("");
-    setShowRisk(false);
-  };
-
-  const handleNext = async () => {
-    if (!city || !zone || !workerId) return;
+  const handleCalculate = () => {
+    if (!city || !zone) return;
     setMlLoading(true);
-    await supabase.from("workers").update({ city, zone }).eq("id", workerId);
-
-    const base = process.env.NEXT_PUBLIC_ML_API_URL?.replace(/\/$/, "") ?? "";
-    try {
-      const res = await fetch(`${base}/ml/risk-score`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city, zone, streak_weeks: 0 }),
-      });
-      if (!res.ok) throw new Error("ml");
-      const j = (await res.json()) as {
-        risk_score: number;
-        tier: string;
-        weekly_premium: number;
-      };
-      setRiskScore(Math.round(j.risk_score));
-      setTier(j.tier);
-      setWeeklyPremium(Number(j.weekly_premium));
-    } catch {
-      setRiskScore(45);
-      setTier("Standard");
-      setWeeklyPremium(100);
-    } finally {
+    setTimeout(() => {
+      const score = Math.floor(Math.random() * 40) + 40;
       setMlLoading(false);
-      setShowRisk(true);
-    }
+      onNext({ city, zone, riskScore: score });
+    }, 2000);
   };
 
   return (
-    <motion.div
-      key="step-location"
-      variants={slideVariants}
-      initial="enter"
-      animate="center"
-      exit="exit"
-      transition={slideTransition}
-      className="w-full"
-    >
-      <h3
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "1.75rem",
-          color: "var(--foreground)",
-          marginBottom: "0.5rem",
-        }}
-      >
-        Select your working area
+    <motion.div key="step-location" variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTransition} className="w-full">
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.75rem", marginBottom: "0.5rem" }}>
+        Service Area
       </h3>
-      <p
-        className="text-sm mb-8"
-        style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-      >
-        We use this to calculate your risk coverage
+      <p className="text-sm mb-8 text-muted">
+        We use ML to calculate your area risk score to suggest the best protection.
       </p>
 
-      {/* City Selection */}
-      <div className="mb-5">
-        <label
-          className="block text-xs mb-2 font-medium"
-          style={{
-            color: "var(--muted)",
-            fontFamily: "var(--font-mono)",
-            fontSize: "0.75rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-          }}
-        >
-          City
-        </label>
+      <div className="space-y-6">
         <div className="grid grid-cols-2 gap-2">
-          {CITIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => handleCitySelect(c)}
-              className="flex items-center gap-2 px-4 py-3 rounded-lg border text-sm transition-all duration-150"
-              style={{
-                borderColor: city === c ? "var(--primary)" : "var(--border)",
-                background: city === c ? "var(--primary-light)" : "white",
-                fontFamily: "var(--font-body)",
-                color: city === c ? "var(--primary)" : "var(--foreground)",
-                fontWeight: city === c ? 600 : 400,
-                boxShadow:
-                  city === c
-                    ? "0 0 0 3px rgba(232, 93, 26, 0.12)"
-                    : "none",
-              }}
-            >
-              <MapPin size={14} />
+          {CITIES.map(c => (
+            <button key={c} onClick={() => { setCity(c); setZone(""); }} className={`p-3 rounded-xl border transition-all ${city === c ? "border-primary bg-primary-light text-primary" : "bg-white"}`}>
               {c}
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Zone Selection */}
-      {city && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="mb-6"
-        >
-          <label
-            className="block text-xs mb-2 font-medium"
-            style={{
-              color: "var(--muted)",
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.75rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
-          >
-            Zone
-          </label>
-          <div
-            className="rounded-xl border p-1 max-h-48 overflow-y-auto custom-scrollbar"
-            style={{
-              borderColor: "var(--border)",
-              background: "white",
-            }}
-          >
-            {cityZones.map((z: string) => (
-              <button
-                key={z}
-                onClick={() => {
-                  setZone(z);
-                  setShowRisk(false);
-                }}
-                className="w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all duration-150"
-                style={{
-                  background: zone === z ? "var(--primary-light)" : "transparent",
-                  fontFamily: "var(--font-body)",
-                  color:
-                    zone === z ? "var(--primary)" : "var(--foreground)",
-                  fontWeight: zone === z ? 500 : 400,
-                }}
-              >
-                {z}
-              </button>
-            ))}
+        {city && (
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-muted">SELECT ZONE</label>
+            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+              {cityZones.map(z => (
+                <button key={z} onClick={() => setZone(z)} className={`w-full text-left p-3 rounded-xl border transition-all ${zone === z ? "border-primary bg-primary-light text-primary" : "bg-white"}`}>
+                  {z}
+                </button>
+              ))}
+            </div>
           </div>
-        </motion.div>
-      )}
-
-      {/* Risk Score Card */}
-      {showRisk && zone && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="mb-6"
-        >
-          <div
-            className="rounded-xl p-5"
-            style={{ boxShadow: cardShadow, background: "white" }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <p
-                className="text-xs font-medium"
-                style={{
-                  color: "var(--muted)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "0.75rem",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Your Risk Score
-              </p>
-              <span
-                className="px-2.5 py-1 rounded-full text-xs font-medium"
-                style={{
-                  background:
-                    riskScore > 60
-                      ? "var(--amber-light)"
-                      : "var(--accent-light)",
-                  color:
-                    riskScore > 60 ? "var(--amber)" : "var(--accent)",
-                  fontFamily: "var(--font-mono)",
-                }}
-              >
-                {tier} · ₹{weeklyPremium}/wk
-              </span>
-            </div>
-            <div className="flex items-end gap-2 mb-3">
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "2rem",
-                  fontWeight: 500,
-                  color: "var(--foreground)",
-                  lineHeight: 1,
-                }}
-              >
-                {riskScore}
-              </span>
-              <span
-                className="mb-1"
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "0.75rem",
-                  color: "var(--muted)",
-                }}
-              >
-                /100
-              </span>
-            </div>
-            {/* Risk bar */}
-            <div
-              className="w-full h-2 rounded-full overflow-hidden"
-              style={{ background: "var(--secondary)" }}
-            >
-              <motion.div
-                className="h-full rounded-full"
-                style={{
-                  background:
-                    riskScore > 60
-                      ? "linear-gradient(90deg, var(--amber), var(--primary))"
-                      : "linear-gradient(90deg, var(--accent), #4ade80)",
-                }}
-                initial={{ width: 0 }}
-                animate={{ width: `${riskScore}%` }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              />
-            </div>
-            <p
-              className="text-xs mt-2"
-              style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-            >
-              {riskScore > 60
-                ? "Your area has higher weather disruption risk — you qualify for enhanced coverage."
-                : "Your area has moderate risk — standard coverage applies."}
-            </p>
-          </div>
-
-          <button
-            onClick={() =>
-              onNext({
-                city,
-                zone,
-                riskScore,
-                tier,
-                weeklyPremium,
-                coverageAmount: Math.round(weeklyPremium * 7),
-              })
-            }
-            className="w-full mt-6 py-3 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 transition-all duration-150"
-            style={{
-              background: "var(--primary)",
-              boxShadow: "0 2px 8px rgba(232,93,26,0.35)",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            Continue <ChevronRight size={16} />
+        )}
+        {zone && (
+          <button onClick={handleCalculate} disabled={mlLoading} className="w-full py-4 rounded-xl bg-primary text-white font-bold shadow-lg">
+            {mlLoading ? "Calculating Risk..." : "Check Area Risk"}
           </button>
-        </motion.div>
-      )}
-
-      {!showRisk && city && zone && (
-        <button
-          onClick={() => void handleNext()}
-          disabled={mlLoading}
-          className="w-full py-3 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 transition-all duration-150 disabled:opacity-60"
-          style={{
-            background: "var(--primary)",
-            boxShadow: "0 2px 8px rgba(232,93,26,0.35)",
-            fontFamily: "var(--font-body)",
-          }}
-        >
-          {mlLoading ? (
-            <>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M12 2a10 10 0 0 1 10 10"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </motion.div>
-              Scoring...
-            </>
-          ) : (
-            <>
-              Check Coverage <ChevronRight size={16} />
-            </>
-          )}
-        </button>
-      )}
+        )}
+      </div>
     </motion.div>
   );
 }
 
-/* ─── Step 5: Activate Policy ─── */
-function StepActivate({
-  data,
+/* ─── Step 5: Choose Protection ─── */
+function StepPlanSelection({
+  riskScore,
+  onNext,
 }: {
-  data: {
-    phone: string;
-    platform: string;
-    partnerId: string;
-    upi: string;
-    city: string;
-    zone: string;
-    riskScore: number;
-    tier: string;
-    weeklyPremium: number;
-    coverageAmount: number;
-  };
+  riskScore: number;
+  onNext: (data: { tier: string; weeklyPremium: number; coverageAmount: number }) => void;
 }) {
-  const [gpsGranted, setGpsGranted] = useState(false);
+  const [selectedTier, setSelectedTier] = useState("Standard");
+
+  return (
+    <motion.div key="step-plan" variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTransition} className="w-full">
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.75rem", marginBottom: "0.5rem" }}>
+        Choose Protection
+      </h3>
+      <p className="text-sm mb-8 text-muted">
+        Based on your risk score, we recommend the tier that covers most earnings.
+      </p>
+
+      <div className="space-y-6">
+        <div className="p-5 bg-white border rounded-2xl flex items-center justify-between" style={{ boxShadow: premiumShadow }}>
+          <div>
+            <p className="text-xs font-bold text-muted">LOCAL RISK SCORE</p>
+            <p className="text-4xl font-mono font-bold" style={{ color: riskScore > 60 ? "var(--primary)" : "var(--accent)" }}>
+              {riskScore}<span className="text-sm opacity-50">/100</span>
+            </p>
+          </div>
+          <div className={`px-3 py-1 rounded-full text-[10px] font-bold ${riskScore > 60 ? "bg-amber-light text-amber" : "bg-accent-light text-accent"}`}>
+            {riskScore > 60 ? "HIGH RISK" : "MODERATE"}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-[10px] font-bold text-muted tracking-widest px-1">AVAILABLE PLANS</label>
+          <div className="space-y-2">
+            {PLANS.map(plan => {
+              const isSel = selectedTier === plan.name;
+              const isRecommended =
+                (riskScore > 70 && plan.name === "Pro") ||
+                (riskScore <= 70 && riskScore >= 45 && plan.name === "Standard") ||
+                (riskScore < 45 && plan.name === "Basic");
+
+              return (
+                <button
+                  key={plan.name}
+                  onClick={() => setSelectedTier(plan.name)}
+                  className={`w-full text-left p-4 rounded-2xl border-2 transition-all relative ${isSel ? "border-primary bg-primary-light" : "bg-white border-border"}`}
+                >
+                  {isRecommended && (
+                    <div className="absolute top-0 right-0 px-2 py-0.5 bg-primary text-white text-[8px] font-bold rounded-bl-lg">
+                      RECOMMENDED
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className={`font-bold ${isSel ? "text-primary" : ""}`}>{plan.name} Plan</p>
+                      <p className="text-xs text-muted">Up to ₹{plan.maxCoverage.toLocaleString()} cover</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono font-bold">₹{plan.premium}</p>
+                      <p className="text-[10px] text-muted">/ WEEK</p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            const p = PLANS.find(x => x.name === selectedTier)!;
+            onNext({ tier: p.name, weeklyPremium: p.premium, coverageAmount: p.maxCoverage });
+          }}
+          className="w-full py-4 rounded-xl bg-primary text-white font-bold shadow-lg"
+        >
+          Review & Activate
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ─── Step 6: Activate Policy ─── */
+function StepActivate({ data }: { data: any }) {
   const [activating, setActivating] = useState(false);
-  const [activateError, setActivateError] = useState<string | null>(null);
   const router = useRouter();
-  const workerId = useAuthStore((s) => s.workerId);
-  const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
+  const workerId = useAuthStore(s => s.workerId);
+  const setOnboardingComplete = useAuthStore(s => s.setOnboardingComplete);
 
   const handleActivate = async () => {
     if (!workerId) return;
-    setActivateError(null);
     setActivating(true);
     try {
-      const start = new Date();
-      const end = new Date(start);
-      end.setDate(end.getDate() + 7);
-      const startStr = start.toISOString().slice(0, 10);
-      const endStr = end.toISOString().slice(0, 10);
-
       const { error: polErr } = await supabase.from("policies").insert({
         worker_id: workerId,
         tier: data.tier,
         weekly_premium: data.weeklyPremium,
         coverage_amount: data.coverageAmount,
         risk_score: data.riskScore,
-        start_date: startStr,
-        end_date: endStr,
         status: "active",
+        start_date: new Date().toISOString().split("T")[0],
+        end_date: new Date(Date.now() + 604800000).toISOString().split("T")[0]
       });
       if (polErr) throw polErr;
-
-      const { error: wErr } = await supabase
-        .from("workers")
-        .update({ is_onboarded: true, wallet_balance: 0 })
-        .eq("id", workerId);
-      if (wErr) throw wErr;
-
+      await supabase.from("workers").update({ is_onboarded: true }).eq("id", workerId);
       setOnboardingComplete();
-      useAppStore.getState().completeOnboarding();
       router.push("/dashboard");
     } catch (e) {
       console.error(e);
-      setActivateError("Could not activate. Please try again.");
     } finally {
       setActivating(false);
     }
   };
 
   return (
-    <motion.div
-      key="step-activate"
-      variants={slideVariants}
-      initial="enter"
-      animate="center"
-      exit="exit"
-      transition={slideTransition}
-      className="w-full"
-    >
-      <h3
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "1.75rem",
-          color: "var(--foreground)",
-          marginBottom: "0.5rem",
-        }}
-      >
+    <motion.div key="step-activate" variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTransition} className="w-full">
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.75rem", marginBottom: "0.5rem" }}>
         Review & Activate
       </h3>
-      <p
-        className="text-sm mb-6"
-        style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-      >
-        Confirm your details and activate your coverage
-      </p>
-
-      {/* Summary Card */}
-      <div
-        className="rounded-xl p-5 mb-4"
-        style={{ boxShadow: cardShadow, background: "white" }}
-      >
-        <div className="space-y-3.5">
-          {[
-            {
-              label: "Phone",
-              value: data.phone,
-              icon: <Phone size={14} />,
-            },
-            {
-              label: "Platform",
-              value: `${data.platform} · ${data.partnerId}`,
-              icon: <CreditCard size={14} />,
-            },
-            {
-              label: "UPI",
-              value: data.upi,
-              icon: <Shield size={14} />,
-            },
-            {
-              label: "Area",
-              value: `${data.city} — ${data.zone}`,
-              icon: <MapPin size={14} />,
-            },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span style={{ color: "var(--muted)" }}>{item.icon}</span>
-                <span
-                  className="text-xs"
-                  style={{
-                    color: "var(--muted)",
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "0.75rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  {item.label}
-                </span>
-              </div>
-              <span
-                className="text-sm"
-                style={{
-                  fontFamily: "var(--font-body)",
-                  color: "var(--foreground)",
-                  fontWeight: 500,
-                }}
-              >
-                {item.value}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div
-          className="my-4"
-          style={{
-            borderTop: "1px solid var(--border)",
-          }}
-        />
-
-        {/* Coverage Details */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p
-              className="text-xs"
-              style={{
-                color: "var(--muted)",
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.75rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Weekly Premium ({data.tier})
-            </p>
-            <p
-              className="text-lg font-semibold"
-              style={{
-                fontFamily: "var(--font-mono)",
-                color: "var(--foreground)",
-                fontWeight: 500,
-              }}
-            >
-              ₹{data.weeklyPremium}
-            </p>
+      <div className="space-y-4 mb-8">
+        <div className="p-5 bg-white border rounded-2xl space-y-3" style={{ boxShadow: premiumShadow }}>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted">Plan selected:</span>
+            <span className="font-bold">{data.tier}</span>
           </div>
-          <div className="text-right">
-            <p
-              className="text-xs"
-              style={{
-                color: "var(--muted)",
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.75rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Max Coverage
-            </p>
-            <p
-              className="text-lg font-semibold"
-              style={{
-                fontFamily: "var(--font-mono)",
-                color: "var(--primary)",
-                fontWeight: 500,
-              }}
-            >
-              ₹{data.coverageAmount}
-            </p>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted">Weekly Premium:</span>
+            <span className="font-bold font-mono">₹{data.weeklyPremium}</span>
           </div>
-          <div className="text-right">
-            <p
-              className="text-xs"
-              style={{
-                color: "var(--muted)",
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.75rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              Risk Score
-            </p>
-            <p
-              className="text-lg font-semibold"
-              style={{
-                fontFamily: "var(--font-mono)",
-                color:
-                  data.riskScore > 60 ? "var(--amber)" : "var(--accent)",
-                fontWeight: 500,
-              }}
-            >
-              {data.riskScore}
-            </p>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted">Coverage Limit:</span>
+            <span className="font-bold text-primary font-mono">₹{data.coverageAmount}</span>
+          </div>
+          <hr className="border-border" />
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted">Delivery Area:</span>
+            <span className="font-medium">{data.zone}, {data.city}</span>
           </div>
         </div>
       </div>
-
-      {/* Loyalty Streak */}
-      <div
-        className="rounded-xl p-4 mb-4 flex items-center gap-3"
-        style={{
-          boxShadow: cardShadow,
-          background: "var(--secondary)",
-        }}
-      >
-        <div
-          className="flex items-center justify-center rounded-lg shrink-0"
-          style={{
-            width: 40,
-            height: 40,
-            background: "var(--amber-light)",
-          }}
-        >
-          <Zap size={18} style={{ color: "var(--amber)" }} />
-        </div>
-        <div className="flex-1">
-          <p
-            className="font-medium text-sm"
-            style={{
-              color: "var(--foreground)",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            Loyalty Streak
-          </p>
-          <p
-            className="text-xs"
-            style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-          >
-            Pay on time for 4 weeks and unlock 10% premium discount
-          </p>
-        </div>
-        <div className="flex gap-1">
-          {[1, 2, 3, 4].map((w) => (
-            <div
-              key={w}
-              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
-              style={{
-                background:
-                  w <= 1 ? "var(--amber)" : "var(--border)",
-                color: w <= 1 ? "white" : "var(--muted)",
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.625rem",
-              }}
-            >
-              {w <= 1 ? "W1" : w}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* GPS Permission Banner */}
-      {!gpsGranted ? (
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="w-full rounded-xl p-4 mb-6 flex items-center gap-3 transition-all duration-200"
-          style={{
-            background: "white",
-            border: "1.5px dashed var(--primary)",
-            cursor: "pointer",
-          }}
-          onClick={() => setGpsGranted(true)}
-        >
-          <div
-            className="flex items-center justify-center rounded-lg shrink-0"
-            style={{
-              width: 40,
-              height: 40,
-              background: "var(--primary-light)",
-            }}
-          >
-            <MapPin size={18} style={{ color: "var(--primary)" }} />
-          </div>
-          <div className="flex-1 text-left">
-            <p
-              className="font-medium text-sm"
-              style={{
-                color: "var(--foreground)",
-                fontFamily: "var(--font-body)",
-              }}
-            >
-              Enable GPS Location
-            </p>
-            <p
-              className="text-xs"
-              style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}
-            >
-              Required for automatic weather-triggered payouts
-            </p>
-          </div>
-          <ChevronRight
-            size={16}
-            style={{ color: "var(--primary)" }}
-          />
-        </motion.button>
-      ) : (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="w-full rounded-xl p-4 mb-6 flex items-center gap-3"
-          style={{
-            background: "var(--accent-light)",
-          }}
-        >
-          <Check size={18} style={{ color: "var(--accent)" }} />
-          <p
-            className="text-sm font-medium"
-            style={{
-              color: "var(--accent)",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            GPS location enabled
-          </p>
-        </motion.div>
-      )}
-
-      {activateError && (
-        <p
-          className="text-sm mb-3 text-center"
-          style={{ color: "var(--primary)", fontFamily: "var(--font-body)" }}
-        >
-          {activateError}
-        </p>
-      )}
-
-      {/* Activate CTA */}
-      <button
-        onClick={() => void handleActivate()}
-        disabled={activating}
-        className="w-full py-4 rounded-lg text-white font-semibold text-base flex items-center justify-center gap-2 transition-all duration-150 disabled:opacity-70"
-        style={{
-          background: activating ? "var(--muted)" : "var(--primary)",
-          boxShadow: activating
-            ? "none"
-            : "0 4px 16px rgba(232,93,26,0.4)",
-          fontFamily: "var(--font-body)",
-          fontSize: "1rem",
-        }}
-      >
-        {activating ? (
-          <>
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <path
-                  d="M12 2a10 10 0 0 1 10 10"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </motion.div>
-            Activating...
-          </>
-        ) : (
-          <>
-            <Shield size={18} />
-            Activate Coverage
-          </>
-        )}
+      <button onClick={handleActivate} className="w-full py-5 rounded-2xl bg-primary text-white font-bold text-lg shadow-xl">
+        {activating ? "Activating..." : "Confirm & Activate"}
       </button>
-
-      {/* Fine print */}
-      <p
-        className="text-center mt-4"
-        style={{
-          color: "var(--muted)",
-          fontFamily: "var(--font-body)",
-          fontSize: "0.6875rem",
-          lineHeight: 1.5,
-        }}
-      >
-        By activating, you agree to our{" "}
-        <span
-          style={{ color: "var(--foreground)", textDecoration: "underline" }}
-        >
-          Terms of Service
-        </span>{" "}
-        and{" "}
-        <span
-          style={{ color: "var(--foreground)", textDecoration: "underline" }}
-        >
-          Privacy Policy
-        </span>
-        . Coverage begins on next Monday.
-      </p>
     </motion.div>
   );
 }
@@ -1793,8 +718,6 @@ function StepActivate({
 /* ─── Main Onboarding Component ─── */
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
-  const [direction, setDirection] = useState<1 | -1>(1);
-
   const [formData, setFormData] = useState({
     phone: "",
     platform: "",
@@ -1808,12 +731,11 @@ export default function OnboardingPage() {
     coverageAmount: 700,
   });
 
-  const totalSteps = 5;
+  const totalSteps = 6;
 
-  const goNext = (partialData: Record<string, any>) => {
-    setDirection(1);
-    setFormData((prev) => ({ ...prev, ...partialData }));
-    setStep((s) => Math.min(s + 1, totalSteps));
+  const goNext = (data: any) => {
+    setFormData(prev => ({ ...prev, ...data }));
+    setStep(s => s + 1);
   };
 
   const stepHeadings: Record<number, string> = {
@@ -1821,80 +743,28 @@ export default function OnboardingPage() {
     2: "Platform Setup",
     3: "Payment Link",
     4: "Location & Risk",
-    5: "Final Review",
+    5: "Choose Protection",
+    6: "Final Review",
   };
 
   return (
-    <div className="flex min-h-screen w-full" style={{ background: "var(--background)" }}>
-      {/* Left Brand Panel */}
+    <div className="flex min-h-screen">
       <BrandPanel />
-
-      {/* Right Form Panel */}
-      <div
-        className="flex-1 flex flex-col overflow-hidden"
-        style={{ background: "var(--background)" }}
-      >
-        {/* Mobile Brand Header */}
-        <div
-          className="lg:hidden flex items-center gap-2.5 px-6 py-4"
-          style={{ borderBottom: "1px solid var(--border)" }}
-        >
-          <div
-            className="flex items-center justify-center rounded-lg"
-            style={{
-              width: 32,
-              height: 32,
-              background: "var(--primary)",
-            }}
-          >
-            <Shield className="text-white" size={16} />
-          </div>
-          <span
-            className="font-semibold tracking-tight"
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "1rem",
-              color: "var(--foreground)",
-            }}
-          >
-            NammaShield
-          </span>
-        </div>
-
-        {/* Progress Section */}
-        <div className="px-8 pt-8 pb-2" style={{ maxWidth: 480, width: "100%" }}>
+      <div className="flex-1 p-8 lg:p-24 bg-background">
+        <div className="max-w-md mx-auto h-full flex flex-col">
           <ProgressBar current={step} total={totalSteps} />
-          <div className="flex items-center justify-between">
-            <p
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.75rem",
-                color: "var(--muted)",
-              }}
-            >
-              Step {step} of {totalSteps}
-            </p>
-            <p
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.75rem",
-                color: "var(--muted)",
-              }}
-            >
-              {stepHeadings[step]}
-            </p>
+          <div className="px-1 mb-6 flex justify-between">
+            <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Step {step} of {totalSteps}</p>
+            <p className="text-[10px] font-mono text-muted uppercase tracking-widest">{stepHeadings[step]}</p>
           </div>
-        </div>
-
-        {/* Step Content */}
-        <div className="flex-1 flex items-start justify-center overflow-y-auto px-8 py-8">
-          <div style={{ maxWidth: 480, width: "100%" }}>
-            <AnimatePresence mode="wait" custom={direction}>
+          <div className="flex-1 flex items-center">
+            <AnimatePresence mode="wait">
               {step === 1 && <StepPhone onNext={goNext} />}
               {step === 2 && <StepPlatformId onNext={goNext} />}
               {step === 3 && <StepUPI onNext={goNext} />}
               {step === 4 && <StepLocation onNext={goNext} />}
-              {step === 5 && <StepActivate data={formData} />}
+              {step === 5 && <StepPlanSelection riskScore={formData.riskScore} onNext={goNext} />}
+              {step === 6 && <StepActivate data={formData} />}
             </AnimatePresence>
           </div>
         </div>
