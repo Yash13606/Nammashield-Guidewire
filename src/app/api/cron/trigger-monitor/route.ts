@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { checkWeatherAndMaybeInsert } from "@/lib/triggers/weatherCheck";
 import { processClaimsForTrigger } from "@/lib/claims/claimsEngine";
 import { getActivePolicyWorkerIds } from "@/lib/db/repositories/policiesRepository";
-import { getWorkersCityZoneByIds } from "@/lib/db/repositories/workers";
+import { getWorkersCityZoneByIds } from "@/lib/db/repositories/workersRepository";
 
 /**
  * Iterates distinct city+zone from workers with active policies,

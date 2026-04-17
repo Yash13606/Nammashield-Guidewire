@@ -11,7 +11,7 @@ import {
   listRecentTriggers,
 } from "@/lib/db/repositories/triggersRepository";
 import { countClaimsByTrigger } from "@/lib/db/repositories/claimsRepository";
-import { getWorkersCityZoneByIds } from "@/lib/db/repositories/workers";
+import { getWorkersCityZoneByIds } from "@/lib/db/repositories/workersRepository";
 import { listRecentFraudCases } from "@/lib/db/repositories/fraudRepository";
 import { getWeatherObservationsSince } from "@/lib/db/repositories/weatherRepository";
 

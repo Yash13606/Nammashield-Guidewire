@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getWorkerById,
-} from "@/lib/db/repositories/workers";
+} from "@/lib/db/repositories/workersRepository";
 import { getLatestActivePolicyForWorker } from "@/lib/db/repositories/policiesRepository";
 
 type Params = { params: { workerId: string } | Promise<{ workerId: string }> };

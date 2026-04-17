@@ -13,7 +13,7 @@ import {
 import {
   getWorkerWalletBalance,
   updateWorkerWalletBalance,
-} from "@/lib/db/repositories/workers";
+} from "@/lib/db/repositories/workersRepository";
 
 export async function processPayoutForClaim(params: {
   claimId: string;

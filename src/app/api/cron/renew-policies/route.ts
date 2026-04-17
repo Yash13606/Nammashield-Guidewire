@@ -8,7 +8,7 @@ import { countClaimsByWorkerInWindow } from "@/lib/db/repositories/claimsReposit
 import {
   getWorkerRenewalDetails,
   updateWorkerStreakWeeks,
-} from "@/lib/db/repositories/workers";
+} from "@/lib/db/repositories/workersRepository";
 
 const ML_BASE = (process.env.ML_API_URL ?? process.env.NEXT_PUBLIC_ML_API_URL ?? "").replace(/\/$/, "");
 

@@ -2,7 +2,7 @@ import { calculatePayout } from "./payoutCalc";
 import { getClaimForPayoutComputation } from "@/lib/db/repositories/claimsRepository";
 import { getPolicyForPayout } from "@/lib/db/repositories/policiesRepository";
 import { getTriggerEventById } from "@/lib/db/repositories/triggersRepository";
-import { getWorkerCity } from "@/lib/db/repositories/workers";
+import { getWorkerCity } from "@/lib/db/repositories/workersRepository";
 
 /** Recompute payout for manual approval of watchlist/flagged claims */
 export async function computeApprovalPayout(claimId: string): Promise<number> {

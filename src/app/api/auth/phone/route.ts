@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createWorkerWithPhone, getWorkerByPhone } from "@/lib/db/repositories/workers";
+import { createWorkerWithPhone, getWorkerByPhone } from "@/lib/db/repositories/workersRepository";
 
 export async function POST(req: NextRequest) {
   try {
