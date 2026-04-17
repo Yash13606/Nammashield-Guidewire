@@ -175,6 +175,7 @@ export default function AdminPage() {
   const [simLoading, setSimLoading] = useState(false);
   const [simResult, setSimResult] = useState<Record<string, unknown> | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState<Record<string, boolean>>({});
   const payoutSeenRef = useRef<Set<string>>(new Set());
   const payoutCursorRef = useRef<string>(new Date().toISOString());
 
@@ -306,13 +307,59 @@ export default function AdminPage() {
   };
 
   const approve = async (id: string) => {
-    await fetch("/api/claims/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ claim_id: id }) });
-    void loadAll();
+    if (actionBusy[id]) return;
+    setActionBusy((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await fetch("/api/claims/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claim_id: id }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string };
+      if (!res.ok || json.ok === false) {
+        toast({
+          title: "Approve failed",
+          description: json.error ?? `Request failed with status ${res.status}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Claim processed",
+          description: json.message ?? "Claim approval action completed.",
+        });
+      }
+      void loadAll();
+    } finally {
+      setActionBusy((prev) => ({ ...prev, [id]: false }));
+    }
   };
 
   const reject = async (id: string) => {
-    await fetch("/api/claims/reject", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ claim_id: id, rejection_reason: "Rejected from admin queue" }) });
-    void loadAll();
+    if (actionBusy[id]) return;
+    setActionBusy((prev) => ({ ...prev, [id]: true }));
+    try {
+      const res = await fetch("/api/claims/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claim_id: id, rejection_reason: "Rejected from admin queue" }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string };
+      if (!res.ok || json.ok === false) {
+        toast({
+          title: "Reject failed",
+          description: json.error ?? `Request failed with status ${res.status}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Claim rejected",
+          description: json.message ?? "Claim moved out of review queue.",
+        });
+      }
+      void loadAll();
+    } finally {
+      setActionBusy((prev) => ({ ...prev, [id]: false }));
+    }
   };
 
   // Charts data
@@ -867,15 +914,15 @@ export default function AdminPage() {
                         )}
                       </td>
                       <td className="py-3.5 text-right">
-                        <button type="button" onClick={() => void approve(row.id)}
+                        <button type="button" onClick={() => void approve(row.id)} disabled={Boolean(actionBusy[row.id])}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold mr-2 transition-all hover:shadow-md"
                           style={{ background: "#DCFCE7", color: "#16A34A", border: "1px solid rgba(22,163,74,0.2)" }}>
-                          <Check size={12} /> Approve
+                          <Check size={12} /> {actionBusy[row.id] ? "Working..." : "Approve"}
                         </button>
-                        <button type="button" onClick={() => void reject(row.id)}
+                        <button type="button" onClick={() => void reject(row.id)} disabled={Boolean(actionBusy[row.id])}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:shadow-md"
                           style={{ background: "var(--secondary)", color: "var(--muted)", border: "1px solid var(--border)" }}>
-                          <X size={12} /> Reject
+                          <X size={12} /> {actionBusy[row.id] ? "Working..." : "Reject"}
                         </button>
                       </td>
                     </tr>

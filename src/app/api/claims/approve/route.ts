@@ -19,10 +19,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });
     }
 
+    if (claim.status === "auto_approved") {
+      return NextResponse.json({ ok: true, message: "Claim already approved" });
+    }
+
+    if (claim.status === "rejected") {
+      return NextResponse.json({ ok: true, message: "Claim already rejected" });
+    }
+
+    if (claim.status === "payout_failed") {
+      return NextResponse.json({ ok: true, message: "Claim already processed with payout failure" });
+    }
+
     if (claim.status !== "watchlist" && claim.status !== "flagged") {
       return NextResponse.json(
-        { error: "Claim not in review queue" },
-        { status: 400 }
+        { error: `Claim not in review queue (status=${claim.status})` },
+        { status: 409 }
       );
     }
 
