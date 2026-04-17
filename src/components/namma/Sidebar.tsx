@@ -11,6 +11,8 @@ import {
   Scale,
   Wallet,
   Shield,
+  User,
+  Bell,
 } from "lucide-react";
 import { Logo } from "@/components/namma/Logo";
 import { useAppStore } from "@/lib/navigationStore";
@@ -20,6 +22,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const WORKER_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, chipClass: "icon-chip-orange" },
+  { href: "/dashboard/profile", label: "Profile", icon: User, chipClass: "icon-chip-amber" },
+  { href: "/dashboard/notifications", label: "Notifications", icon: Bell, chipClass: "icon-chip-blue" },
   { href: "/dashboard/policy", label: "Policy", icon: FileText, chipClass: "icon-chip-blue" },
   { href: "/dashboard/claims", label: "Claims", icon: Scale, chipClass: "icon-chip-green" },
   { href: "/dashboard/calculator", label: "Calculator", icon: Calculator, chipClass: "icon-chip-amber" },

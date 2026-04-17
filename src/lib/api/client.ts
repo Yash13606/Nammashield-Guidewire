@@ -159,3 +159,75 @@ export function apiActivateOnboardingPolicy(
     body: payload,
   });
 }
+
+export type NotificationPreferences = {
+  worker_id: string;
+  push_enabled: boolean;
+  payout_enabled: boolean;
+  trigger_enabled: boolean;
+  fraud_enabled: boolean;
+  profile_updates_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkerNotification = {
+  id: string;
+  worker_id: string;
+  category: string;
+  title: string;
+  message: string;
+  metadata: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+  read_at: string | null;
+};
+
+export function apiGetWorkerProfile(workerId: string) {
+  return requestJson<{
+    worker: import("@/lib/supabase/types").Worker;
+    notificationPreferences: NotificationPreferences | null;
+  }>(`/api/workers/${workerId}/profile`);
+}
+
+export function apiUpdateWorkerProfile(
+  workerId: string,
+  payload: Record<string, unknown>
+) {
+  return requestJson<{
+    worker: import("@/lib/supabase/types").Worker;
+    notificationPreferences: NotificationPreferences | null;
+    message: string;
+  }>(`/api/workers/${workerId}/profile`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function apiGetWorkerNotifications(
+  workerId: string,
+  options?: { limit?: number; unreadOnly?: boolean }
+) {
+  const params = new URLSearchParams();
+  if (options?.limit !== undefined) params.set("limit", String(options.limit));
+  if (options?.unreadOnly) params.set("unread_only", "true");
+  const qs = params.toString();
+
+  return requestJson<{ notifications: WorkerNotification[]; unread_count: number }>(
+    `/api/workers/${workerId}/notifications${qs ? `?${qs}` : ""}`
+  );
+}
+
+export function apiMarkWorkerNotificationRead(workerId: string, notificationId: string) {
+  return requestJson<{ ok: boolean; message: string }>(`/api/workers/${workerId}/notifications/read`, {
+    method: "PATCH",
+    body: { notification_id: notificationId },
+  });
+}
+
+export function apiMarkAllWorkerNotificationsRead(workerId: string) {
+  return requestJson<{ ok: boolean; message: string }>(`/api/workers/${workerId}/notifications/read`, {
+    method: "PATCH",
+    body: { mark_all: true },
+  });
+}

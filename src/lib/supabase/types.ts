@@ -7,6 +7,9 @@ export interface Worker {
   partner_id: string | null;
   city: string | null;
   zone: string | null;
+  preferred_language: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
   device_fingerprint: string | null;
   wallet_balance: number;
   streak_weeks: number;

@@ -1,11 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { Bell, Wifi } from "lucide-react";
 import { useAppStore } from "@/lib/navigationStore";
 import { useDashboardState } from "@/components/namma/DashboardStateProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
+import { useAuthStore } from "@/lib/authStore";
+import { apiGetWorkerNotifications } from "@/lib/api/client";
 
 function initials(name: string | null, phone: string | null) {
   if (name && name.trim().length >= 1) {
@@ -19,6 +23,8 @@ function initials(name: string | null, phone: string | null) {
 
 const PAGE_SUBTITLES: Record<string, string> = {
   "/dashboard": "Your live coverage overview",
+  "/dashboard/profile": "Update profile and preferences",
+  "/dashboard/notifications": "Live alerts and payout updates",
   "/dashboard/policy": "Manage your plan details",
   "/dashboard/claims": "Payout history & AI decisions",
   "/dashboard/calculator": "Estimate your weekly premium",
@@ -26,12 +32,47 @@ const PAGE_SUBTITLES: Record<string, string> = {
 };
 
 export function Topbar() {
+  const router = useRouter();
   const pathname = usePathname() || "";
   const { role } = useAppStore();
   const { worker, loading } = useDashboardState();
+  const workerId = useAuthStore((s) => s.workerId);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!workerId || role === "admin") {
+      setUnreadCount(0);
+      return;
+    }
+    let stopped = false;
+
+    const loadUnread = async () => {
+      try {
+        const data = await apiGetWorkerNotifications(workerId, { limit: 1, unreadOnly: true });
+        if (stopped) return;
+        setUnreadCount(data.unread_count ?? 0);
+      } catch {
+        if (!stopped) setUnreadCount(0);
+      }
+    };
+
+    void loadUnread();
+    const interval = window.setInterval(() => {
+      void loadUnread();
+    }, 20_000);
+
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, [workerId, role]);
 
   const title = pathname.includes("/policy")
     ? "Policy Management"
+    : pathname.includes("/profile")
+      ? "Profile"
+      : pathname.includes("/notifications")
+        ? "Notifications"
     : pathname.includes("/claims")
       ? "Claims & Payouts"
       : pathname.includes("/calculator")
@@ -140,13 +181,28 @@ export function Topbar() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           style={{ background: "var(--secondary)" }}
+          onClick={() => {
+            if (role === "admin") return;
+            router.push("/dashboard/notifications");
+          }}
+          title="Notifications"
         >
           <Bell size={17} style={{ color: "var(--muted)" }} />
           {/* Notification dot */}
-          <span
-            className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-            style={{ background: "var(--primary)" }}
-          />
+          {unreadCount > 0 && (
+            <>
+              <span
+                className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+                style={{ background: "var(--primary)" }}
+              />
+              <span
+                className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full text-[10px] leading-4 text-center font-semibold"
+                style={{ background: "var(--primary)", color: "white", fontFamily: "var(--font-mono)" }}
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            </>
+          )}
         </motion.button>
 
         {/* Avatar */}

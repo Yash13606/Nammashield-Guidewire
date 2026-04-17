@@ -8,6 +8,9 @@ const ALLOWED_FIELDS = new Set([
   "zone",
   "is_onboarded",
   "streak_weeks",
+  "preferred_language",
+  "emergency_contact_name",
+  "emergency_contact_phone",
 ]);
 
 type Params = { params: { workerId: string } | Promise<{ workerId: string }> };
@@ -30,6 +33,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
       if (key === "streak_weeks" && typeof value === "number" && Number.isFinite(value)) {
         updates.streak_weeks = value;
+      }
+      if (key === "preferred_language" && (typeof value === "string" || value === null)) {
+        updates.preferred_language = value;
+      }
+      if (key === "emergency_contact_name" && (typeof value === "string" || value === null)) {
+        updates.emergency_contact_name = value;
+      }
+      if (key === "emergency_contact_phone" && (typeof value === "string" || value === null)) {
+        updates.emergency_contact_phone = value;
       }
     }
 

@@ -10,6 +10,7 @@ import {
   createClaim,
 } from "@/lib/db/repositories/claimsRepository";
 import { insertFraudAuditLogs } from "@/lib/db/repositories/fraudRepository";
+import { createWorkerNotification, getWorkerNotificationPreferences } from "@/lib/db/repositories/notificationsRepository";
 
 export type ClaimsSummary = {
   affected: number;
@@ -145,6 +146,21 @@ export async function processClaimsForTrigger(
 
     if (!claimRow) continue;
 
+    const notificationPrefs = await getWorkerNotificationPreferences(workerId);
+    if (notificationPrefs?.trigger_enabled !== false) {
+      await createWorkerNotification({
+        worker_id: workerId,
+        category: "trigger",
+        title: "New disruption claim generated",
+        message: `${ev.event_type.replace(/_/g, " ")} created a claim with status ${status}.`,
+        metadata: {
+          claim_id: claimRow.id,
+          trigger_event_id: triggerEventId,
+          status,
+        },
+      });
+    }
+
     if (fraudEval.reasonCodes.length > 0) {
       await insertFraudAuditLogs(
         fraudEval.reasonCodes.map((reasonCode) => ({
@@ -172,6 +188,20 @@ export async function processClaimsForTrigger(
       } else {
         auto_approved -= 1;
         payout_failed += 1;
+      }
+    } else if (notificationPrefs?.fraud_enabled !== false) {
+      if (status === "flagged" || status === "watchlist" || status === "rejected") {
+        await createWorkerNotification({
+          worker_id: workerId,
+          category: "fraud",
+          title: "Claim needs review",
+          message: `Claim was marked as ${status}. ${rejectionReason ?? "Fraud checks requested manual review."}`,
+          metadata: {
+            claim_id: claimRow.id,
+            fraud_decision: fraudEval.decision,
+            anomaly_score: fraudEval.anomalyScore,
+          },
+        });
       }
     }
   }

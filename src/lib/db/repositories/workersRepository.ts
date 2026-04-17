@@ -20,6 +20,9 @@ export type WorkerProfileRow = {
   partner_id: string | null;
   city: string | null;
   zone: string | null;
+  preferred_language: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
   device_fingerprint: string | null;
   wallet_balance: number;
   streak_weeks: number;
@@ -46,6 +49,9 @@ export async function getWorkerById(workerId: string) {
       partner_id,
       city,
       zone,
+      preferred_language,
+      emergency_contact_name,
+      emergency_contact_phone,
       device_fingerprint,
       COALESCE(wallet_balance, 0)::float8 AS wallet_balance,
       COALESCE(streak_weeks, 0)::int4 AS streak_weeks,
@@ -143,10 +149,31 @@ export async function setWorkerOnboarded(workerId: string) {
 export async function updateWorkerProfile(
   workerId: string,
   updates: Partial<
-    Pick<WorkerProfileRow, "name" | "partner_id" | "city" | "zone" | "is_onboarded" | "streak_weeks">
+    Pick<
+      WorkerProfileRow,
+      | "name"
+      | "partner_id"
+      | "city"
+      | "zone"
+      | "is_onboarded"
+      | "streak_weeks"
+      | "preferred_language"
+      | "emergency_contact_name"
+      | "emergency_contact_phone"
+    >
   >
 ) {
-  const allowed = new Set(["name", "partner_id", "city", "zone", "is_onboarded", "streak_weeks"]);
+  const allowed = new Set([
+    "name",
+    "partner_id",
+    "city",
+    "zone",
+    "is_onboarded",
+    "streak_weeks",
+    "preferred_language",
+    "emergency_contact_name",
+    "emergency_contact_phone",
+  ]);
   const entries = Object.entries(updates).filter(
     ([key, value]) => allowed.has(key) && value !== undefined
   );
@@ -168,6 +195,9 @@ export async function updateWorkerProfile(
        partner_id,
        city,
        zone,
+      preferred_language,
+      emergency_contact_name,
+      emergency_contact_phone,
        device_fingerprint,
        COALESCE(wallet_balance, 0)::float8 AS wallet_balance,
        COALESCE(streak_weeks, 0)::int4 AS streak_weeks,

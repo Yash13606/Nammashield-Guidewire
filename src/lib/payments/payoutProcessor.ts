@@ -14,6 +14,7 @@ import {
   getWorkerWalletBalance,
   updateWorkerWalletBalance,
 } from "@/lib/db/repositories/workersRepository";
+import { createWorkerNotification, getWorkerNotificationPreferences } from "@/lib/db/repositories/notificationsRepository";
 
 export async function processPayoutForClaim(params: {
   claimId: string;
@@ -21,6 +22,7 @@ export async function processPayoutForClaim(params: {
   amount: number;
 }) {
   const { claimId, workerId, amount } = params;
+  const notificationPrefs = await getWorkerNotificationPreferences(workerId);
 
   const txRow = await createPayoutTransaction({
       claim_id: claimId,
@@ -58,6 +60,21 @@ export async function processPayoutForClaim(params: {
 
     await updateClaimPayoutFailed(claimId, failureText, gateway.channel, gateway.processedAt);
 
+    if (notificationPrefs?.payout_enabled !== false) {
+      await createWorkerNotification({
+        worker_id: workerId,
+        category: "payout",
+        title: "Payout failed",
+        message: failureText,
+        metadata: {
+          claim_id: claimId,
+          channel: gateway.channel,
+          amount,
+          failure_code: gateway.failureCode,
+        },
+      });
+    }
+
     return {
       ok: false,
       failureCode: gateway.failureCode,
@@ -88,6 +105,21 @@ export async function processPayoutForClaim(params: {
     wallet_balance_after: next,
     status: "completed",
   });
+
+  if (notificationPrefs?.payout_enabled !== false) {
+    await createWorkerNotification({
+      worker_id: workerId,
+      category: "payout",
+      title: "Payout credited",
+      message: `INR ${Math.round(amount).toLocaleString("en-IN")} was credited to your wallet.`,
+      metadata: {
+        claim_id: claimId,
+        channel: gateway.channel,
+        amount,
+        wallet_balance_after: next,
+      },
+    });
+  }
 
   return {
     ok: true,
