@@ -8,12 +8,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as {
       claim_id?: string;
+      claimId?: string;
       rejection_reason?: string;
     };
-    const { claim_id, rejection_reason = "Rejected by reviewer" } = body;
+    const claim_id = body.claim_id ?? body.claimId;
+    const { rejection_reason = "Rejected by reviewer" } = body;
 
     if (!claim_id) {
-      return NextResponse.json({ error: "claim_id required" }, { status: 400 });
+      return NextResponse.json({ error: "claim_id (or claimId) required" }, { status: 400 });
     }
 
     const claim = await getClaimStatus(claim_id);

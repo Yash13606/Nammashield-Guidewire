@@ -8,10 +8,10 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { claim_id?: string };
-    const claimId = body.claim_id;
+    const body = (await req.json()) as { claim_id?: string; claimId?: string };
+    const claimId = body.claim_id ?? body.claimId;
     if (!claimId) {
-      return NextResponse.json({ error: "claim_id required" }, { status: 400 });
+      return NextResponse.json({ error: "claim_id (or claimId) required" }, { status: 400 });
     }
 
     const claim = await getClaimForApproval(claimId);
