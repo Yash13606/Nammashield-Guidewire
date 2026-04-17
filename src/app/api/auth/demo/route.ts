@@ -3,7 +3,7 @@ import {
   createWorkerWithPhone,
   getWorkerByPhone,
   updateWorkerProfile,
-} from "@/lib/db/repositories/workersRepository";
+} from "@/lib/db/repositories/workers";
 import { getLatestActivePolicyForWorker, insertPolicy } from "@/lib/db/repositories/policiesRepository";
 
 const ML_BASE = (process.env.ML_API_URL ?? process.env.NEXT_PUBLIC_ML_API_URL ?? "").replace(/\/$/, "");

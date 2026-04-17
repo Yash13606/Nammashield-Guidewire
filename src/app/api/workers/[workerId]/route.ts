@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { updateWorkerProfile } from "@/lib/db/repositories/workersRepository";
+import { updateWorkerProfile } from "@/lib/db/repositories/workers";
 
 const ALLOWED_FIELDS = new Set([
   "name",

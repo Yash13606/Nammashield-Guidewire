@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { insertPolicy } from "@/lib/db/repositories/policiesRepository";
-import { setWorkerOnboarded } from "@/lib/db/repositories/workersRepository";
+import { setWorkerOnboarded } from "@/lib/db/repositories/workers";
 
 type Params = { params: { workerId: string } | Promise<{ workerId: string }> };
 

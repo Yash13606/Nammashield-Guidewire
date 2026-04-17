@@ -3,7 +3,7 @@ import { calculatePayout } from "./payoutCalc";
 import { evaluateClaimFraud } from "@/lib/fraud/anomalyScoring";
 import { processPayoutForClaim } from "@/lib/payments/payoutProcessor";
 import { getTriggerEventById } from "@/lib/db/repositories/triggersRepository";
-import { getWorkersByCityZone } from "@/lib/db/repositories/workersRepository";
+import { getWorkersByCityZone } from "@/lib/db/repositories/workers";
 import { getActivePoliciesByWorkerIds } from "@/lib/db/repositories/policiesRepository";
 import { createClaim } from "@/lib/db/repositories/claimsRepository";
 import { insertFraudAuditLogs } from "@/lib/db/repositories/fraudRepository";

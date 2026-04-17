@@ -3,7 +3,7 @@ import {
   getFraudReasonCodesByClaimIds,
   getReviewQueueClaims,
 } from "@/lib/db/repositories/claimsRepository";
-import { getWorkersByIds } from "@/lib/db/repositories/workersRepository";
+import { getWorkersByIds } from "@/lib/db/repositories/workers";
 import { getTriggerEventsByIds } from "@/lib/db/repositories/triggersRepository";
 
 export async function GET() {

@@ -4,7 +4,7 @@ import { countClaimsByWorkerSince } from "@/lib/db/repositories/claimsRepository
 import {
   countWorkersByDeviceFingerprint,
   getWorkerDeviceFingerprint,
-} from "@/lib/db/repositories/workersRepository";
+} from "@/lib/db/repositories/workers";
 
 const ML_BASE = (process.env.ML_API_URL ?? process.env.NEXT_PUBLIC_ML_API_URL ?? "").replace(/\/$/, "");
 
