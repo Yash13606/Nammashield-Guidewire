@@ -47,8 +47,8 @@ NammaShield is a **parametric income protection platform** built specifically fo
 │                        NammaShield Platform                     │
 │                                                                 │
 │  ┌──────────────────────┐     ┌──────────────────────────────┐  │
-│  │   Next.js Frontend   │────▶│     Supabase (PostgreSQL)    │  │
-│  │  (React 19 + TS)     │     │   Realtime DB + Auth + RLS   │  │
+│  │   Next.js Frontend   │────▶│  Railway PostgreSQL Backend  │  │
+│  │  (React 19 + TS)     │     │   (Primary App Database)     │  │
 │  │                      │◀────│                              │  │
 │  │  • Landing Page      │     └──────────────────────────────┘  │
 │  │  • Worker Dashboard  │                                        │
@@ -60,7 +60,7 @@ NammaShield is a **parametric income protection platform** built specifically fo
 │             │                 │  • Fraud Detection Agent (GBC)│  │
 │             ▼                 └──────────────────────────────┘  │
 │  ┌──────────────────────┐                                        │
-│  │   Vercel Cron Jobs   │                                        │
+│  │   Scheduler/Cron     │                                        │
 │  │  • Trigger Monitor   │                                        │
 │  │  • Policy Renewal    │                                        │
 │  └──────────────────────┘                                        │
@@ -154,7 +154,7 @@ NammaShield/
 │   │   └── page.tsx           # Landing page
 │   ├── components/            # Reusable UI components (shadcn/ui)
 │   ├── hooks/                 # Custom React hooks
-│   └── lib/                   # Utilities, Supabase client, Claims Engine
+│   └── lib/                   # Utilities, Postgres repos, Claims Engine
 ├── ml/
 │   ├── api.py                 # Flask API server
 │   ├── risk_model.py          # Risk scoring model
@@ -169,9 +169,11 @@ NammaShield/
 │       ├── 002_policies.sql
 │       ├── 003_core_tables.sql
 │       ├── 004_zones.sql
+│       ├── 005_fraud_payout_upgrade.sql
 │       └── run_all.sql        # Run all migrations at once
 ├── public/                    # Static assets
 ├── vercel.json                # Vercel cron job config
+├── railway.json               # Railway build/deploy config
 ├── next.config.ts
 ├── tailwind.config.ts
 └── package.json
@@ -185,12 +187,12 @@ NammaShield/
 |---|---|
 | **Frontend** | Next.js 16, React 19, TypeScript 5 |
 | **Styling** | Tailwind CSS 4, shadcn/ui, Radix UI, Framer Motion |
-| **Database** | Supabase (PostgreSQL + Realtime + RLS) |
+| **Database** | Railway PostgreSQL (primary), Supabase (legacy compatibility) |
 | **ML Service** | Python 3.11, Flask 3.1, scikit-learn 1.4, Gunicorn |
 | **State Management** | Zustand, TanStack Query |
 | **Forms** | React Hook Form, Zod |
 | **Charts** | Recharts |
-| **Deployment** | Vercel (Frontend), Render (ML Service) |
+| **Deployment** | Railway (Backend + Postgres), Vercel (optional frontend scheduler), Render (ML Service) |
 
 ---
 
@@ -200,7 +202,8 @@ NammaShield/
 
 - **Node.js** ≥ 18.x
 - **Python** ≥ 3.11
-- A **Supabase** project (free tier works)
+- A **Railway PostgreSQL** database
+- (Optional) Supabase keys only for legacy endpoints not yet migrated
 
 ---
 
@@ -226,21 +229,36 @@ npm install
 Create a `.env.local` file in the project root:
 
 ```env
-# Supabase (Required)
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Railway Postgres (Primary backend DB)
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DBNAME
 
-# ML Microservice
+# Backend-only ML base URL (recommended for Railway server runtime)
+ML_API_URL=http://127.0.0.1:5000
+
+# Public ML URL for browser features (calculator, UI calls)
 NEXT_PUBLIC_ML_API_URL=http://127.0.0.1:5000
+
+# Weather + Payout simulation
+OPENWEATHERMAP_API_KEY=your_openweather_api_key
+MOCK_UPI_FAIL_RATE=0.15
+
+# Legacy Supabase vars (optional during migration window)
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-> 💡 Get your Supabase URL and Anon Key from **Project Settings → API** in the Supabase dashboard.
+> ✅ Railway cutover env priority:
+> 1. `DATABASE_URL` (required for backend APIs + cron routes)
+> 2. `ML_API_URL` (server-to-server ML calls from API/cron)
+> 3. `NEXT_PUBLIC_ML_API_URL` (browser-facing ML calls)
+> 4. Supabase vars only for legacy endpoints still using `supabaseAdmin`
 
 ---
 
 ### 4. Set Up the Database
 
-Run the migrations in your **Supabase SQL Editor** in order:
+Run the migrations in your **Railway Postgres SQL editor/client** in order:
 
 ```sql
 -- Option A: Run all at once
@@ -248,6 +266,24 @@ Run the migrations in your **Supabase SQL Editor** in order:
 
 -- Option B: Run individually (in order)
 -- 001_workers.sql → 002_policies.sql → 003_core_tables.sql → 004_zones.sql
+-- 005_fraud_payout_upgrade.sql
+```
+
+Required cutover tables after migrations:
+- Core: `workers`, `policies`, `trigger_events`, `claims`, `gps_logs`, `payout_log`, `zones`
+- Fraud/Payout upgrades: `weather_observations`, `fraud_audit_logs`, `payout_transactions`
+
+Quick verification query:
+
+```sql
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN (
+    'workers','policies','trigger_events','claims','gps_logs','payout_log','zones',
+    'weather_observations','fraud_audit_logs','payout_transactions'
+  )
+ORDER BY table_name;
 ```
 
 ---
@@ -296,23 +332,33 @@ The app will be available at **`http://localhost:3000`** 🎉
 
 ## ☁️ Deployment
 
-### Frontend → Vercel
+### Backend + DB → Railway (primary)
 
-1. Push your code to GitHub.
-2. Import the repository into [Vercel](https://vercel.com).
-3. Add environment variables in Vercel Project Settings:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_ML_API_URL` ← Set to your deployed Render ML service URL
-4. Deploy.
+1. Create a Railway project for this repository.
+2. Railway will use `railway.json`:
+   - Build: `npm ci && npm run build`
+   - Start: `npm run start`
+   - Healthcheck: `GET /api`
+3. Provision Railway Postgres and set `DATABASE_URL` on the app service.
+4. Set backend env vars on Railway:
+   - `DATABASE_URL` (required)
+   - `ML_API_URL` (recommended server-side ML base URL)
+   - `OPENWEATHERMAP_API_KEY`
+   - `MOCK_UPI_FAIL_RATE`
+5. Run SQL migrations on Railway Postgres (`run_all.sql` or 001→005 in order).
 
-Vercel Cron Jobs are pre-configured in `vercel.json`:
-- **`/api/cron/trigger-monitor`** — runs every 15 minutes
-- **`/api/cron/renew-policies`** — runs daily at 00:30 UTC
+### Cron wiring for Railway-backed backend
+
+Your cron endpoints live in the Next.js backend:
+- `GET /api/cron/trigger-monitor`
+- `GET /api/cron/renew-policies`
+
+If backend is on Railway, schedule these URLs via Railway Cron (or any external scheduler).  
+`vercel.json` cron config only applies when routes are executed from a Vercel deployment.
 
 ---
 
-### ML Service → Render
+### ML Service → Render (or any Python host)
 
 1. Create a new **Web Service** on [Render](https://render.com).
 2. Connect your GitHub repository.
@@ -320,7 +366,9 @@ Vercel Cron Jobs are pre-configured in `vercel.json`:
 4. Render will auto-detect `render.yaml` and configure the service:
    - **Build**: `pip install -r requirements.txt && python train_data.py && python risk_model.py && python fraud_model.py`
    - **Start**: `gunicorn api:app --bind 0.0.0.0:$PORT`
-5. After deployment, copy the Render service URL and set it as `NEXT_PUBLIC_ML_API_URL` in Vercel.
+5. After deployment:
+   - Set `ML_API_URL` on Railway backend service
+   - Set `NEXT_PUBLIC_ML_API_URL` where browser clients are hosted (Vercel/Railway frontend)
 
 ---
 
@@ -331,7 +379,7 @@ Base URL: `http://127.0.0.1:5000` (local) or your Render deployment URL.
 ### Risk Score
 
 ```http
-POST /predict-risk
+POST /ml/risk-score
 Content-Type: application/json
 
 {
@@ -356,7 +404,7 @@ Content-Type: application/json
 ### Fraud Detection
 
 ```http
-POST /predict-fraud
+POST /ml/fraud-score
 Content-Type: application/json
 
 {
@@ -369,8 +417,8 @@ Content-Type: application/json
 **Response:**
 ```json
 {
-  "fraud_probability": 0.12,
-  "status": "auto_approved"
+  "fraud_score": 0.12,
+  "decision": "auto_approved"
 }
 ```
 
@@ -382,8 +430,11 @@ Content-Type: application/json
 |---|---|
 | `workers` | Delivery partner profiles and wallet balances |
 | `policies` | Weekly coverage records with status and tier |
-| `claims` | Claim records with payout amounts and fraud scores |
-| `triggers` | Disruption events (Rain, AQI, Shutdown) by zone |
+| `trigger_events` | Disruption events (Rain, AQI, Shutdown) by zone |
+| `claims` | Claim records with payout status, fraud score, and anomaly score |
+| `weather_observations` | Weather evidence used by trigger/fraud logic |
+| `fraud_audit_logs` | Claim-level fraud reason codes and evidence |
+| `payout_transactions` | Payout gateway lifecycle records |
 | `zones` | City zone definitions and risk metadata |
 
 ---

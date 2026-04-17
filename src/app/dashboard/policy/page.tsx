@@ -12,9 +12,9 @@ import { CountUp } from "@/components/namma/CountUp";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { supabase } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/authStore";
 import { useToast } from "@/hooks/use-toast";
+import { apiSwitchActivePolicy } from "@/lib/api/client";
 import {
   RadialBarChart,
   RadialBar,
@@ -341,17 +341,11 @@ function PlanComparison() {
 
     setIsSwitching(true);
     try {
-      const { error } = await supabase
-        .from("policies")
-        .update({
-          tier: plan.name,
-          weekly_premium: plan.premium,
-          coverage_amount: plan.maxCoverage,
-        })
-        .eq("worker_id", workerId)
-        .eq("status", "active");
-
-      if (error) throw error;
+      await apiSwitchActivePolicy(workerId, {
+        tier: plan.name,
+        weekly_premium: plan.premium,
+        coverage_amount: plan.maxCoverage,
+      });
 
       await refresh();
       toast({

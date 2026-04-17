@@ -23,13 +23,13 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { supabase } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/authStore";
 import { useDashboardState } from "@/components/namma/DashboardStateProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import Link from "next/link";
 import { CountUp } from "@/components/namma/CountUp";
+import { apiGetWorkerClaims, type WorkerClaimRow } from "@/lib/api/client";
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 16 },
@@ -67,16 +67,7 @@ function claimBorderColor(label: string | null) {
   return "var(--border)";
 }
 
-type ClaimRow = {
-  id: string;
-  created_at: string;
-  payout_amount: number;
-  status: string;
-  covered_hours: number | null;
-  active_score: number | null;
-  fraud_score: number | null;
-  trigger_events: { event_type: string } | null;
-};
+type ClaimRow = WorkerClaimRow;
 
 // Custom tooltip for area chart
 const AreaTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
@@ -100,12 +91,12 @@ export default function ClaimsPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("claims")
-        .select("id, created_at, payout_amount, status, covered_hours, active_score, fraud_score, trigger_events(event_type)")
-        .eq("worker_id", workerId)
-        .order("created_at", { ascending: false });
-      if (!cancelled && !error) setClaims((data ?? []) as unknown as ClaimRow[]);
+      try {
+        const { claims: data } = await apiGetWorkerClaims(workerId);
+        if (!cancelled) setClaims(data as ClaimRow[]);
+      } catch (e) {
+        console.error(e);
+      }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -291,6 +282,7 @@ export default function ClaimsPage() {
               {claims.map((payout, index) => {
                 const isCompleted = payout.status === "auto_approved";
                 const isProcessing = payout.status === "watchlist" || payout.status === "flagged";
+                const isPayoutFailed = payout.status === "payout_failed" || payout.payout_status === "failed";
                 const et = payout.trigger_events?.event_type ?? null;
                 const label = et?.replace(/_/g, " ") ?? "Disruption";
                 const borderColor = claimBorderColor(et);
@@ -372,13 +364,30 @@ export default function ClaimsPage() {
                           {isCompleted && (
                             <div className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full"
                               style={{ color: "#16A34A", background: "#DCFCE7" }}>
-                              <Check size={12} /> Credited via UPI
+                              <Check size={12} /> Credited via {(payout.payout_channel ?? "UPI").replace(/_/g, " ")}
+                            </div>
+                          )}
+                          {isCompleted && payout.payout_processed_at && (
+                            <div className="text-[10px]" style={{ color: "var(--muted)" }}>
+                              {format(new Date(payout.payout_processed_at), "dd MMM yyyy · HH:mm")}
                             </div>
                           )}
                           {isProcessing && (
                             <div className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full"
                               style={{ color: "#D97706", background: "#FEF3C7" }}>
                               <Loader2 size={12} className="animate-spin" /> Under review
+                            </div>
+                          )}
+                          {isPayoutFailed && (
+                            <div className="flex flex-col items-end gap-1">
+                              <div className="text-[11px] px-2.5 py-1 rounded-full" style={{ color: "#DC2626", background: "#FEE2E2" }}>
+                                Payout failed
+                              </div>
+                              {payout.payout_failure_reason && (
+                                <p className="text-[10px] max-w-[220px] text-right" style={{ color: "var(--muted)" }}>
+                                  {payout.payout_failure_reason}
+                                </p>
+                              )}
                             </div>
                           )}
                           {payout.status === "rejected" && (

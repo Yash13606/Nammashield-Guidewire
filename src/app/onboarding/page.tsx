@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/namma/Logo";
 import { useAuthStore } from "@/lib/authStore";
-import { supabase } from "@/lib/supabase/client";
 import { ZONES, PLANS } from "@/lib/mockData";
 import { useRouter } from "next/navigation";
+import { apiActivateOnboardingPolicy, apiUpdateWorker } from "@/lib/api/client";
 
 /* ─── Animation Config ─── */
 const slideVariants = {
@@ -441,7 +441,7 @@ function StepPlatformId({
             onClick={async () => {
               if (!workerId) return;
               setSaving(true);
-              await supabase.from("workers").update({ partner_id: "SWG-48721", name: platform }).eq("id", workerId);
+              await apiUpdateWorker(workerId, { partner_id: "SWG-48721", name: platform });
               setSaving(false);
               onNext({ platform, partnerId: "SWG-48721" });
             }}
@@ -661,18 +661,12 @@ function StepActivate({ data }: { data: any }) {
     if (!workerId) return;
     setActivating(true);
     try {
-      const { error: polErr } = await supabase.from("policies").insert({
-        worker_id: workerId,
+      await apiActivateOnboardingPolicy(workerId, {
         tier: data.tier,
-        weekly_premium: data.weeklyPremium,
-        coverage_amount: data.coverageAmount,
-        risk_score: data.riskScore,
-        status: "active",
-        start_date: new Date().toISOString().split("T")[0],
-        end_date: new Date(Date.now() + 604800000).toISOString().split("T")[0]
+        weeklyPremium: data.weeklyPremium,
+        coverageAmount: data.coverageAmount,
+        riskScore: data.riskScore,
       });
-      if (polErr) throw polErr;
-      await supabase.from("workers").update({ is_onboarded: true }).eq("id", workerId);
       setOnboardingComplete();
       router.push("/dashboard");
     } catch (e) {
@@ -717,6 +711,7 @@ function StepActivate({ data }: { data: any }) {
 
 /* ─── Main Onboarding Component ─── */
 export default function OnboardingPage() {
+  const setOnboardingComplete = useAuthStore(s => s.setOnboardingComplete);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     phone: "",

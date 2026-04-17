@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { bulkInsertGpsLogs } from "@/lib/db/repositories/gpsRepository";
+import { queryRows } from "@/lib/db/postgres";
 
 /** Seeds 12 hourly GPS pings (past 12 hours) for every worker — demo/admin use */
 export async function POST() {
-  const { data: workers, error } = await supabaseAdmin
-    .from("workers")
-    .select("id");
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  const workers = await queryRows<{ id: string }>("SELECT id FROM workers");
 
   const now = Date.now();
   const rows: Array<{
@@ -37,11 +32,7 @@ export async function POST() {
     return NextResponse.json({ inserted: 0 });
   }
 
-  const { error: insErr } = await supabaseAdmin.from("gps_logs").insert(rows);
-
-  if (insErr) {
-    return NextResponse.json({ error: insErr.message }, { status: 500 });
-  }
+  await bulkInsertGpsLogs(rows);
 
   return NextResponse.json({ inserted: rows.length });
 }

@@ -1,33 +1,19 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
 import { calculatePayout } from "./payoutCalc";
+import { getClaimForPayoutComputation } from "@/lib/db/repositories/claimsRepository";
+import { getPolicyForPayout } from "@/lib/db/repositories/policiesRepository";
+import { getTriggerEventById } from "@/lib/db/repositories/triggersRepository";
+import { getWorkerCity } from "@/lib/db/repositories/workersRepository";
 
 /** Recompute payout for manual approval of watchlist/flagged claims */
 export async function computeApprovalPayout(claimId: string): Promise<number> {
-  const { data: claim, error: cErr } = await supabaseAdmin
-    .from("claims")
-    .select("worker_id, policy_id, trigger_event_id")
-    .eq("id", claimId)
-    .single();
+  const claim = await getClaimForPayoutComputation(claimId);
+  if (!claim) throw new Error("Claim not found");
 
-  if (cErr || !claim) throw new Error("Claim not found");
-
-  const { data: policy } = await supabaseAdmin
-    .from("policies")
-    .select("tier, weekly_premium")
-    .eq("id", claim.policy_id)
-    .single();
-
-  const { data: ev } = await supabaseAdmin
-    .from("trigger_events")
-    .select("started_at, ended_at")
-    .eq("id", claim.trigger_event_id)
-    .single();
-
-  const { data: worker } = await supabaseAdmin
-    .from("workers")
-    .select("city")
-    .eq("id", claim.worker_id)
-    .single();
+  const [policy, ev, worker] = await Promise.all([
+    getPolicyForPayout(claim.policy_id),
+    getTriggerEventById(claim.trigger_event_id),
+    getWorkerCity(claim.worker_id),
+  ]);
 
   if (!policy || !ev || !worker?.city) throw new Error("Missing relations");
 

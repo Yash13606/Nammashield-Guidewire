@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
 import { processClaimsForTrigger } from "@/lib/claims/claimsEngine";
+import { createTriggerEvent } from "@/lib/db/repositories/triggersRepository";
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,9 +34,7 @@ export async function POST(req: NextRequest) {
       started.getTime() + Math.max(0.5, duration_hours) * 60 * 60 * 1000
     );
 
-    const { data: trigger, error } = await supabaseAdmin
-      .from("trigger_events")
-      .insert({
+    const trigger = await createTriggerEvent({
         event_type,
         city,
         zone,
@@ -46,15 +44,10 @@ export async function POST(req: NextRequest) {
         ended_at: ended.toISOString(),
         source: "simulation",
         is_simulated: true,
-      })
-      .select()
-      .single();
+      });
 
-    if (error || !trigger) {
-      return NextResponse.json(
-        { error: error?.message ?? "insert failed" },
-        { status: 500 }
-      );
+    if (!trigger) {
+      return NextResponse.json({ error: "insert failed" }, { status: 500 });
     }
 
     const summary = await processClaimsForTrigger(trigger.id);
@@ -67,6 +60,7 @@ export async function POST(req: NextRequest) {
       watchlist: summary.watchlist,
       flagged: summary.flagged,
       rejected: summary.rejected,
+      payout_failed: summary.payout_failed,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";

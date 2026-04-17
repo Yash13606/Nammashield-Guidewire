@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import {
+  expirePolicy,
+  insertPolicy,
+  listPoliciesExpiringOn,
+} from "@/lib/db/repositories/policiesRepository";
+import { countClaimsByWorkerInWindow } from "@/lib/db/repositories/claimsRepository";
+import {
+  getWorkerRenewalDetails,
+  updateWorkerStreakWeeks,
+} from "@/lib/db/repositories/workersRepository";
 
-const ML_BASE = process.env.NEXT_PUBLIC_ML_API_URL?.replace(/\/$/, "") ?? "";
+const ML_BASE = (process.env.ML_API_URL ?? process.env.NEXT_PUBLIC_ML_API_URL ?? "").replace(/\/$/, "");
 
 async function mlRisk(city: string, zone: string, streakWeeks: number) {
   if (!ML_BASE) {
@@ -27,34 +36,23 @@ export async function GET() {
   try {
     const today = new Date().toISOString().slice(0, 10);
 
-    const { data: expiring, error } = await supabaseAdmin
-      .from("policies")
-      .select("id, worker_id, start_date, end_date")
-      .eq("status", "active")
-      .eq("end_date", today);
-
-    if (error) throw error;
+    const expiring = await listPoliciesExpiringOn(today);
 
     const results: Array<{ worker_id: string; renewed: boolean }> = [];
 
     for (const pol of expiring ?? []) {
-      const { data: worker } = await supabaseAdmin
-        .from("workers")
-        .select("city, zone, streak_weeks")
-        .eq("id", pol.worker_id)
-        .single();
+      const worker = await getWorkerRenewalDetails(pol.worker_id);
 
       if (!worker?.city || !worker?.zone) {
         results.push({ worker_id: pol.worker_id, renewed: false });
         continue;
       }
 
-      const { count: claimCount } = await supabaseAdmin
-        .from("claims")
-        .select("*", { count: "exact", head: true })
-        .eq("worker_id", pol.worker_id)
-        .gte("created_at", `${pol.start_date}T00:00:00`)
-        .lte("created_at", `${pol.end_date}T23:59:59`);
+      const claimCount = await countClaimsByWorkerInWindow(
+        pol.worker_id,
+        `${pol.start_date}T00:00:00`,
+        `${pol.end_date}T23:59:59`
+      );
 
       const hadClaims = (claimCount ?? 0) > 0;
       const nextStreak = hadClaims ? 0 : (worker.streak_weeks ?? 0) + 1;
@@ -66,12 +64,8 @@ export async function GET() {
       const end = new Date(start);
       end.setDate(end.getDate() + 7);
 
-      await supabaseAdmin
-        .from("policies")
-        .update({ status: "expired" })
-        .eq("id", pol.id);
-
-      await supabaseAdmin.from("policies").insert({
+      await expirePolicy(pol.id);
+      await insertPolicy({
         worker_id: pol.worker_id,
         tier: risk.tier,
         weekly_premium: risk.weekly_premium,
@@ -79,13 +73,9 @@ export async function GET() {
         risk_score: risk.risk_score,
         start_date: start.toISOString().slice(0, 10),
         end_date: end.toISOString().slice(0, 10),
-        status: "active",
       });
 
-      await supabaseAdmin
-        .from("workers")
-        .update({ streak_weeks: nextStreak })
-        .eq("id", pol.worker_id);
+      await updateWorkerStreakWeeks(pol.worker_id, nextStreak);
 
       results.push({ worker_id: pol.worker_id, renewed: true });
     }

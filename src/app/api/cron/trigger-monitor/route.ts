@@ -1,38 +1,23 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
 import { checkWeatherAndMaybeInsert } from "@/lib/triggers/weatherCheck";
 import { processClaimsForTrigger } from "@/lib/claims/claimsEngine";
+import { getActivePolicyWorkerIds } from "@/lib/db/repositories/policiesRepository";
+import { getWorkersCityZoneByIds } from "@/lib/db/repositories/workersRepository";
 
 /**
  * Iterates distinct city+zone from workers with active policies,
  * runs weather check; on new trigger, processes claims.
  */
 export async function GET() {
-  const { data: policies, error } = await supabaseAdmin
-    .from("policies")
-    .select("worker_id")
-    .eq("status", "active");
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  const workerIds = [...new Set((policies ?? []).map((p) => p.worker_id))];
+  const workerIds = [...new Set(await getActivePolicyWorkerIds())];
   if (workerIds.length === 0) {
     return NextResponse.json({ ok: true, checked: 0, results: [] });
   }
 
-  const { data: workers, error: wErr } = await supabaseAdmin
-    .from("workers")
-    .select("city, zone")
-    .in("id", workerIds);
-
-  if (wErr) {
-    return NextResponse.json({ error: wErr.message }, { status: 500 });
-  }
+  const workers = await getWorkersCityZoneByIds(workerIds);
 
   const pairs = new Map<string, { city: string; zone: string }>();
-  for (const w of workers ?? []) {
+  for (const w of workers) {
     if (w.city && w.zone) {
       pairs.set(`${w.city}|${w.zone}`, { city: w.city, zone: w.zone });
     }

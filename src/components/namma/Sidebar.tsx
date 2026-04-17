@@ -150,16 +150,22 @@ export function Sidebar() {
                   fontWeight: isActive ? 600 : 400,
                 }}
               >
+                {!isActive && (
+                  <motion.div
+                    className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    style={{ background: "var(--secondary)", zIndex: 0 }}
+                  />
+                )}
                 {isActive && (
                   <motion.div
                     layoutId="sidebar-active"
                     className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full"
-                    style={{ background: "var(--primary)" }}
+                    style={{ background: "var(--primary)", zIndex: 1 }}
                     transition={{ type: "spring", stiffness: 400, damping: 35 }}
                   />
                 )}
                 <span
-                  className={`flex items-center justify-center rounded-lg transition-all duration-150 ${item.chipClass}`}
+                  className={`relative z-10 flex items-center justify-center rounded-lg transition-all duration-150 ${item.chipClass}`}
                   style={{
                     width: 28,
                     height: 28,
@@ -169,13 +175,7 @@ export function Sidebar() {
                 >
                   <Icon size={14} />
                 </span>
-                <span>{item.label}</span>
-                {!isActive && (
-                  <motion.div
-                    className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-                    style={{ background: "var(--secondary)" }}
-                  />
-                )}
+                <span className="relative z-10">{item.label}</span>
               </Link>
             );
           })}

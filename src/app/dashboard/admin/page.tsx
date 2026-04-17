@@ -59,6 +59,24 @@ type Summary = {
   weeklyPremiums: number;
   totalPayouts: number;
   lossRatio: number;
+  zoneLossRatios?: Array<{
+    zone: string;
+    premiums: number;
+    payouts: number;
+    lossRatio: number;
+  }>;
+  predictiveForecast?: Array<{
+    city: string;
+    zone: string;
+    expected_disruption_risk: number;
+    expected_claim_load: number;
+  }>;
+  flaggedFraudCases?: Array<{
+    reason_code: string;
+    severity: string;
+    created_at: string;
+    claim_id: string;
+  }>;
   recentTriggers: Array<{
     id: string;
     event_type: string;
@@ -79,6 +97,7 @@ type QueueRow = {
   active_score: number;
   status: string;
   created_at: string;
+  reason_codes?: string[];
   worker?: { name: string | null; phone: string };
   trigger?: { event_type: string };
 };
@@ -390,6 +409,65 @@ export default function AdminPage() {
         </div>
       </motion.div>
 
+      {/* ── Predictive Forecast + Zone Loss Ratios ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <motion.div className="bg-white rounded-2xl p-6" style={{ boxShadow: cardShadow }} {...fadeUp(0.255)}>
+          <h3 className="text-sm font-semibold mb-1" style={{ fontFamily: "var(--font-body)" }}>
+            Predictive Outlook (Next Week)
+          </h3>
+          <p className="text-xs mb-4" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
+            Rule-based projection from recent weather and trigger signals
+          </p>
+          {(summary?.predictiveForecast?.length ?? 0) === 0 ? (
+            <p className="text-sm" style={{ color: "var(--muted)" }}>No forecast data yet</p>
+          ) : (
+            <div className="space-y-2.5">
+              {(summary?.predictiveForecast ?? []).map((item) => (
+                <div key={`${item.city}-${item.zone}`} className="rounded-xl border p-3" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-semibold">{item.city} · {item.zone}</p>
+                    <span className="text-xs font-semibold" style={{ color: item.expected_disruption_risk > 65 ? "#DC2626" : item.expected_disruption_risk > 35 ? "#D97706" : "#16A34A" }}>
+                      Risk {item.expected_disruption_risk}%
+                    </span>
+                  </div>
+                  <p className="text-xs" style={{ color: "var(--muted)" }}>
+                    Expected claim load: <strong style={{ color: "var(--foreground)" }}>{item.expected_claim_load}</strong>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div className="bg-white rounded-2xl p-6" style={{ boxShadow: cardShadow }} {...fadeUp(0.257)}>
+          <h3 className="text-sm font-semibold mb-1" style={{ fontFamily: "var(--font-body)" }}>
+            Zone Loss Ratios
+          </h3>
+          <p className="text-xs mb-4" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
+            Premium vs payout ratio by active zone
+          </p>
+          {(summary?.zoneLossRatios?.length ?? 0) === 0 ? (
+            <p className="text-sm" style={{ color: "var(--muted)" }}>No zone ratio data yet</p>
+          ) : (
+            <div className="space-y-2">
+              {(summary?.zoneLossRatios ?? []).slice(0, 6).map((row) => (
+                <div key={row.zone} className="rounded-xl border px-3 py-2.5 flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
+                  <div>
+                    <p className="text-sm font-semibold">{row.zone}</p>
+                    <p className="text-xs" style={{ color: "var(--muted)" }}>
+                      Premiums ₹{Math.round(row.premiums).toLocaleString("en-IN")} · Payouts ₹{Math.round(row.payouts).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                  <span className="text-sm font-bold" style={{ color: row.lossRatio > 90 ? "#DC2626" : row.lossRatio > 60 ? "#D97706" : "#16A34A" }}>
+                    {row.lossRatio.toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </div>
+
       {/* ── Simulate Disruption ── */}
       <motion.div className="bg-white rounded-2xl p-6 mb-6" style={{ boxShadow: cardShadow }} {...fadeUp(0.26)}>
         <div className="flex items-center gap-2.5 mb-5">
@@ -529,6 +607,7 @@ export default function AdminPage() {
                   <th className="text-left pb-3 uppercase tracking-wider">Trigger</th>
                   <th className="text-center pb-3 uppercase tracking-wider">Fraud Score</th>
                   <th className="text-center pb-3 uppercase tracking-wider">Active Score</th>
+                  <th className="text-left pb-3 uppercase tracking-wider">Flags</th>
                   <th className="text-right pb-3 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -564,6 +643,23 @@ export default function AdminPage() {
                             <div className="h-full rounded-full bg-[#16A34A]" style={{ width: `${activePct}%` }} />
                           </div>
                         </div>
+                      </td>
+                      <td className="py-3.5 text-left">
+                        {(row.reason_codes?.length ?? 0) > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {(row.reason_codes ?? []).slice(0, 2).map((reason) => (
+                              <span
+                                key={reason}
+                                className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                                style={{ background: "#FEF3C7", color: "#D97706" }}
+                              >
+                                {reason}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs" style={{ color: "var(--muted)" }}>—</span>
+                        )}
                       </td>
                       <td className="py-3.5 text-right">
                         <button type="button" onClick={() => void approve(row.id)}

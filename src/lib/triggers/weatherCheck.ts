@@ -1,4 +1,9 @@
-import { supabaseAdmin } from "@/lib/supabase/server";
+import {
+  getZoneBounds,
+  getZoneBoundsByCity,
+  insertWeatherObservation,
+} from "@/lib/db/repositories/weatherRepository";
+import { createTriggerEvent } from "@/lib/db/repositories/triggersRepository";
 
 export type WeatherInsertResult = {
   triggered: boolean;
@@ -18,12 +23,7 @@ export async function checkWeatherAndMaybeInsert(
   city: string,
   zone: string
 ): Promise<WeatherInsertResult> {
-  const { data: zrow } = await supabaseAdmin
-    .from("zones")
-    .select("lat_min, lat_max, lng_min, lng_max")
-    .eq("city", city)
-    .eq("zone_name", zone)
-    .maybeSingle();
+  const zrow = await getZoneBounds(city, zone);
 
   let lat: number;
   let lng: number;
@@ -32,12 +32,7 @@ export async function checkWeatherAndMaybeInsert(
     lat = (Number(zrow.lat_min) + Number(zrow.lat_max)) / 2;
     lng = (Number(zrow.lng_min) + Number(zrow.lng_max)) / 2;
   } else {
-    const { data: fallback } = await supabaseAdmin
-      .from("zones")
-      .select("lat_min, lat_max, lng_min, lng_max")
-      .eq("city", city)
-      .limit(1)
-      .maybeSingle();
+    const fallback = await getZoneBoundsByCity(city);
     if (!fallback) {
       return { triggered: false, trigger: null, reason: "no_zone_for_city" };
     }
@@ -65,6 +60,16 @@ export async function checkWeatherAndMaybeInsert(
   const temp = w.main?.temp ?? 0;
   const feels = w.main?.feels_like ?? 0;
 
+  await insertWeatherObservation({
+    city,
+    zone,
+    observed_at: new Date().toISOString(),
+    rain_mm: rain,
+    condition_text:
+      rain > 0 ? "rain" : temp > 35 ? "hot_clear" : "clear",
+    source: "openweather",
+  });
+
   const rainTrigger = rain > 15;
   const heatTrigger = temp > 42 && feels > 48;
 
@@ -81,9 +86,7 @@ export async function checkWeatherAndMaybeInsert(
   const started = new Date();
   const ended = new Date(started.getTime() + 5 * 60 * 60 * 1000);
 
-  const { data: inserted, error } = await supabaseAdmin
-    .from("trigger_events")
-    .insert({
+  const inserted = await createTriggerEvent({
       event_type: rainTrigger ? "heavy_rain" : "extreme_heat",
       zone,
       city,
@@ -93,12 +96,10 @@ export async function checkWeatherAndMaybeInsert(
       ended_at: ended.toISOString(),
       source: "openweather",
       is_simulated: false,
-    })
-    .select()
-    .single();
+    });
 
-  if (error) {
-    return { triggered: false, trigger: null, reason: error.message };
+  if (!inserted) {
+    return { triggered: false, trigger: null, reason: "insert_trigger_failed" };
   }
 
   return {

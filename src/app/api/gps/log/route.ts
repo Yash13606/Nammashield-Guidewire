@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase/server";
+import { insertGpsLog } from "@/lib/db/repositories/gpsRepository";
 
 const lastLogByWorker = new Map<string, number>();
 const RATE_MS = 60_000;
@@ -28,15 +28,16 @@ export async function POST(req: NextRequest) {
     }
     lastLogByWorker.set(worker_id, now);
 
-    const { error } = await supabaseAdmin.from("gps_logs").insert({
-      worker_id,
-      lat,
-      lng,
-      is_active,
-    });
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    try {
+      await insertGpsLog({
+        worker_id,
+        lat,
+        lng,
+        is_active,
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "failed to insert GPS log";
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });

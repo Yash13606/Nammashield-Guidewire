@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { supabase } from "@/lib/supabase/client";
+import { apiGetDashboardState, apiLoginAsDemo, apiLoginWithPhone } from "@/lib/api/client";
 
 interface AuthState {
   workerId: string | null;
@@ -15,7 +15,7 @@ interface AuthState {
   setOnboardingComplete: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   workerId: null,
   workerPhone: null,
   isAuthenticated: false,
@@ -25,32 +25,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginWithPhone: async (phone: string) => {
     set({ isLoading: true });
     try {
-      // Check if worker already exists
-      const { data: existing, error: fetchError } = await supabase
-        .from("workers")
-        .select("id, phone, is_onboarded")
-        .eq("phone", phone)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-
-      let workerId: string;
-      let onboarded = false;
-
-      if (existing) {
-        workerId = existing.id;
-        onboarded = Boolean(existing.is_onboarded);
-      } else {
-        const { data: newWorker, error: insertError } = await supabase
-          .from("workers")
-          .insert({ phone })
-          .select("id, is_onboarded")
-          .single();
-
-        if (insertError) throw insertError;
-        workerId = newWorker.id;
-        onboarded = Boolean(newWorker.is_onboarded);
-      }
+      const session = await apiLoginWithPhone(phone);
+      const workerId = session.workerId;
+      const onboarded = session.isOnboarded;
 
       localStorage.setItem("nammashield_worker_id", workerId);
       localStorage.setItem("nammashield_worker_phone", phone);
@@ -72,80 +49,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginAsDemo: async () => {
     set({ isLoading: true });
     try {
-      const demoPhone = "+91 00000 00000";
-      const demoCity = "Chennai";
-      const demoZone = "Zone 4 — T. Nagar";
-
-      // 1. Ensure demo worker exists
-      const { data: worker, error: workerErr } = await supabase
-        .from("workers")
-        .upsert(
-          {
-            phone: demoPhone,
-            name: "Demo Partner",
-            city: demoCity,
-            zone: demoZone,
-            is_onboarded: true,
-            streak_weeks: 3,
-          },
-          { onConflict: "phone" }
-        )
-        .select("id")
-        .single();
-
-      if (workerErr) throw workerErr;
-
-      const workerId = worker.id;
-
-      // 2. Check if a policy already exists for this demo worker
-      const { data: existingPolicy } = await supabase
-        .from("policies")
-        .select("id")
-        .eq("worker_id", workerId)
-        .eq("status", "active")
-        .maybeSingle();
-
-      // 3. If no policy, call ML API for risk score and create one
-      if (!existingPolicy) {
-        let riskScore = 67;
-        let tier = "Standard";
-        let weeklyPremium = 100;
-        let coverageAmount = 700;
-
-        try {
-          const mlBase = process.env.NEXT_PUBLIC_ML_API_URL ?? "http://localhost:5000";
-          const mlRes = await fetch(`${mlBase}/ml/risk-score`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ city: demoCity, zone: demoZone, streak_weeks: 3 }),
-          });
-          if (mlRes.ok) {
-            const ml = await mlRes.json() as { risk_score: number; tier: string; weekly_premium: number };
-            riskScore = ml.risk_score;
-            tier = ml.tier;
-            weeklyPremium = ml.weekly_premium;
-            coverageAmount = weeklyPremium * 7;
-          }
-        } catch {
-          // fall back to defaults above
-        }
-
-        const weekStart = new Date();
-        weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Monday
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-
-        await supabase.from("policies").insert({
-          worker_id: workerId,
-          tier,
-          weekly_premium: weeklyPremium,
-          coverage_amount: coverageAmount,
-          risk_score: riskScore,
-          status: "active",
-          week_start: weekStart.toISOString().split("T")[0],
-          week_end: weekEnd.toISOString().split("T")[0],
-        });
-      }
+      const session = await apiLoginAsDemo();
+      const workerId = session.workerId;
+      const demoPhone = session.phone;
 
       localStorage.setItem("nammashield_worker_id", workerId);
       localStorage.setItem("nammashield_worker_phone", demoPhone);
@@ -182,21 +88,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const savedPhone = localStorage.getItem("nammashield_worker_phone");
 
     if (savedId && savedPhone) {
-      const { data, error } = await supabase
-        .from("workers")
-        .select("id, is_onboarded")
-        .eq("id", savedId)
-        .maybeSingle();
-
-      if (data && !error) {
-        set({
-          workerId: savedId,
-          workerPhone: savedPhone,
-          isAuthenticated: true,
-          isLoading: false,
-          isOnboarded: Boolean(data.is_onboarded),
-        });
-        return;
+      try {
+        const { worker } = await apiGetDashboardState(savedId);
+        if (worker) {
+          set({
+            workerId: savedId,
+            workerPhone: savedPhone,
+            isAuthenticated: true,
+            isLoading: false,
+            isOnboarded: Boolean(worker.is_onboarded),
+          });
+          return;
+        }
+      } catch {
+        // handled below by clearing local session
       }
 
       localStorage.removeItem("nammashield_worker_id");

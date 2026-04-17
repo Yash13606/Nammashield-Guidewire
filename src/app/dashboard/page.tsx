@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -18,7 +18,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Logo } from "@/components/namma/Logo";
-import { supabase } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/authStore";
 import { useDashboardState } from "@/components/namma/DashboardStateProvider";
 import { toast } from "@/hooks/use-toast";
@@ -27,6 +26,7 @@ import { RiskRing } from "@/components/namma/RiskRing";
 import { TriggerRow } from "@/components/namma/TriggerRow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { apiGetDashboardFeed, apiGetWorkerClaims } from "@/lib/api/client";
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 16 },
@@ -128,26 +128,29 @@ export default function DashboardPage() {
     }>
   >([]);
   const [coverageUsed, setCoverageUsed] = useState(0);
+  const toastSeenClaimIds = useRef<Set<string>>(new Set());
+  const toastCursorRef = useRef<string>(new Date().toISOString());
 
   useEffect(() => {
     if (!workerId || !worker?.city) { setFeedLoading(false); return; }
     let cancelled = false;
     async function load() {
       setFeedLoading(true);
-      const [trRes, clRes] = await Promise.all([
-        supabase.from("trigger_events").select("id, event_type, severity, city, zone, started_at").eq("city", worker!.city!).order("created_at", { ascending: false }).limit(5),
-        supabase.from("claims").select("id, created_at, payout_amount, status, trigger_events(event_type)").eq("worker_id", workerId).order("created_at", { ascending: false }).limit(5),
-      ]);
-      if (cancelled) return;
-      setTriggers((trRes.data ?? []) as unknown as typeof triggers);
-      setRecentClaims((clRes.data ?? []) as unknown as typeof recentClaims);
-      if (policy) {
-        const { data: sumRows } = await supabase.from("claims").select("payout_amount").eq("worker_id", workerId).eq("policy_id", policy.id);
-        const used = (sumRows ?? []).reduce((s, r) => s + Number(r.payout_amount ?? 0), 0);
-        setCoverageUsed(used);
-      } else {
-        setCoverageUsed(0);
+      try {
+        const feed = await apiGetDashboardFeed(workerId, worker!.city!, policy?.id);
+        if (cancelled) return;
+        setTriggers(feed.triggers as typeof triggers);
+        setRecentClaims(feed.recentClaims as typeof recentClaims);
+        setCoverageUsed(feed.coverageUsed);
+      } catch (e) {
+        if (!cancelled) {
+          console.error(e);
+          setTriggers([]);
+          setRecentClaims([]);
+          setCoverageUsed(0);
+        }
       }
+      if (cancelled) return;
       setFeedLoading(false);
     }
     void load();
@@ -156,15 +159,49 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!workerId) return;
-    const ch = supabase.channel(`claims-toast-${workerId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "claims", filter: `worker_id=eq.${workerId}` }, async (payload) => {
-      const row = payload.new as { status: string; payout_amount: number; trigger_event_id: string };
-      if (row.status !== "auto_approved" || Number(row.payout_amount) <= 0) return;
-      const { data: te } = await supabase.from("trigger_events").select("event_type").eq("id", row.trigger_event_id).maybeSingle();
-      const label = (te?.event_type ?? "Disruption").replace(/_/g, " ");
-      toast({ title: `₹${Number(row.payout_amount).toLocaleString("en-IN")} credited via UPI (Simulation)`, description: `Zero-touch claim processed for ${label}.` });
-      void refresh();
-    }).subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    toastSeenClaimIds.current.clear();
+    toastCursorRef.current = new Date().toISOString();
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const since = toastCursorRef.current;
+        const { claims } = await apiGetWorkerClaims(workerId, {
+          status: "auto_approved",
+          since,
+          limit: 20,
+        });
+        if (stopped || claims.length === 0) return;
+
+        const sorted = [...claims].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+
+        for (const row of sorted) {
+          if (toastSeenClaimIds.current.has(row.id)) continue;
+          toastSeenClaimIds.current.add(row.id);
+          if (Number(row.payout_amount) <= 0) continue;
+          const label = (row.trigger_events?.event_type ?? "Disruption").replace(/_/g, " ");
+          toast({
+            title: `₹${Number(row.payout_amount).toLocaleString("en-IN")} credited via UPI (Simulation)`,
+            description: `Zero-touch claim processed for ${label}.`,
+          });
+        }
+
+        toastCursorRef.current = sorted[sorted.length - 1]!.created_at;
+        void refresh();
+      } catch (e) {
+        if (!stopped) console.error(e);
+      }
+    };
+
+    void poll();
+    const id = window.setInterval(() => {
+      void poll();
+    }, 15_000);
+    return () => {
+      stopped = true;
+      window.clearInterval(id);
+    };
   }, [workerId, refresh]);
 
   const displayName = worker?.name?.trim() || worker?.phone || "Partner";
@@ -185,6 +222,9 @@ export default function DashboardPage() {
   const riskBand = riskScore < 35 ? "Low Risk" : riskScore < 70 ? "Standard Risk" : "High Risk";
   const riskColor = riskScore < 35 ? "#16A34A" : riskScore < 70 ? "#D97706" : "#DC2626";
   const tableRows = recentClaims.slice(0, 3);
+  const upcomingCoverageStart = policy
+    ? new Date(new Date(policy.end_date).getTime() + 24 * 60 * 60 * 1000)
+    : null;
 
   if (profileLoading) {
     return (
@@ -257,6 +297,11 @@ export default function DashboardPage() {
               Your <strong style={{ color: "var(--foreground)" }}>{tierLabel} Plan</strong> is active for this week
               {worker?.city ? ` · ${worker.city}${worker.zone ? `, ${worker.zone}` : ""}` : ""}
             </p>
+            {upcomingCoverageStart && (
+              <p className="text-xs" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
+                Upcoming coverage period starts {format(upcomingCoverageStart, "dd MMM yyyy")}
+              </p>
+            )}
 
             {/* Coverage bar */}
             <div className="space-y-1.5 max-w-md">

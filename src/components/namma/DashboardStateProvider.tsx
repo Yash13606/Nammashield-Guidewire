@@ -8,8 +8,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import { supabase } from "@/lib/supabase/client";
 import { useAuthStore } from "@/lib/authStore";
+import { apiGetDashboardState } from "@/lib/api/client";
 import type { Policy, Worker } from "@/lib/supabase/types";
 
 type DashboardState = {
@@ -43,24 +43,9 @@ export function DashboardStateProvider({
     setLoading(true);
     setError(null);
     try {
-      const { data: w, error: wErr } = await supabase
-        .from("workers")
-        .select("*")
-        .eq("id", workerId)
-        .maybeSingle();
-      if (wErr) throw wErr;
-      setWorker(w as Worker);
-
-      const { data: p, error: pErr } = await supabase
-        .from("policies")
-        .select("*")
-        .eq("worker_id", workerId)
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (pErr) throw pErr;
-      setPolicy(p as Policy | null);
+      const { worker: w, policy: p } = await apiGetDashboardState(workerId);
+      setWorker((w ?? null) as Worker | null);
+      setPolicy((p ?? null) as Policy | null);
     } catch (e) {
       console.error(e);
       setError("Could not load profile");
@@ -77,27 +62,11 @@ export function DashboardStateProvider({
 
   useEffect(() => {
     if (!workerId) return;
-    const ch = supabase
-      .channel(`worker-${workerId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "workers",
-          filter: `id=eq.${workerId}`,
-        },
-        (payload) => {
-          if (payload.new && typeof payload.new === "object") {
-            setWorker(payload.new as Worker);
-          }
-        }
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(ch);
-    };
-  }, [workerId]);
+    const id = window.setInterval(() => {
+      void refresh();
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [workerId, refresh]);
 
   const value = useMemo(
     () => ({ worker, policy, loading, error, refresh }),
