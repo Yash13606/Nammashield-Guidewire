@@ -11,7 +11,7 @@ export async function POST() {
   try {
     const demoPhone = "+91 00000 00000";
     const demoCity = "Chennai";
-    const demoZone = "Zone 4 - T. Nagar";
+    const demoZone = "Zone 3 - T Nagar";
 
     const existing = await getWorkerByPhone(demoPhone);
     const worker = existing ?? (await createWorkerWithPhone(demoPhone));
@@ -19,11 +19,15 @@ export async function POST() {
 
     const workerId = worker.id;
     await updateWorkerProfile(workerId, {
-      name: "Demo Partner",
+      name: "Ravi Kumar (Demo)",
+      partner_id: "SWG-DEMO-65420",
       city: demoCity,
       zone: demoZone,
       is_onboarded: true,
       streak_weeks: 3,
+      preferred_language: "en",
+      emergency_contact_name: "Lakshmi Kumar",
+      emergency_contact_phone: "+91 90000 12345",
     });
 
     const existingPolicy = await getLatestActivePolicyForWorker(workerId);

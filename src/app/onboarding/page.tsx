@@ -210,14 +210,17 @@ function StepPhone({
 }: {
   onNext: (data: { phone: string }) => void;
 }) {
+  const router = useRouter();
   const [phone, setPhone] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const loginWithPhone = useAuthStore((s) => s.loginWithPhone);
+  const loginAsDemo = useAuthStore((s) => s.loginAsDemo);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -274,6 +277,20 @@ function StepPhone({
   ) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setError(null);
+    setDemoLoading(true);
+    try {
+      await loginAsDemo();
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Demo login error:", err);
+      setError("Unable to start demo mode. Please try again.");
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -338,22 +355,43 @@ function StepPhone({
       </div>
 
       {!otpSent ? (
-        <button
-          onClick={handleSendOtp}
-          disabled={phone.length !== 10 || sending}
-          className={`w-full py-3.5 rounded-xl text-white font-semibold text-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${phone.length === 10 ? "btn-shimmer" : ""}`}
-          style={{
-            background:
-              phone.length === 10 && !sending
-                ? "linear-gradient(135deg, var(--primary), #F07030)"
-                : "var(--muted)",
-            fontFamily: "var(--font-body)",
-            border: "none",
-            cursor: phone.length === 10 ? "pointer" : "default",
-          }}
-        >
-          {sending ? "Sending..." : "Send OTP"}
-        </button>
+        <div className="space-y-3">
+          <button
+            onClick={handleSendOtp}
+            disabled={phone.length !== 10 || sending || demoLoading}
+            className={`w-full py-3.5 rounded-xl text-white font-semibold text-sm transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${phone.length === 10 ? "btn-shimmer" : ""}`}
+            style={{
+              background:
+                phone.length === 10 && !sending
+                  ? "linear-gradient(135deg, var(--primary), #F07030)"
+                  : "var(--muted)",
+              fontFamily: "var(--font-body)",
+              border: "none",
+              cursor: phone.length === 10 ? "pointer" : "default",
+            }}
+          >
+            {sending ? "Sending..." : "Send OTP"}
+          </button>
+
+          <button
+            onClick={() => {
+              void handleDemoLogin();
+            }}
+            disabled={sending || demoLoading || verifying}
+            className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 border"
+            style={{
+              background: "white",
+              borderColor: "var(--border)",
+              color: "var(--foreground)",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            {demoLoading ? "Starting demo..." : "Use Demo User (Skip phone + onboarding)"}
+          </button>
+          <p className="text-xs text-center" style={{ color: "var(--muted)" }}>
+            For judges: opens a prefilled fake profile with active policy and sample data.
+          </p>
+        </div>
       ) : (
         <div>
           <div className="flex gap-2.5 mb-4">
@@ -458,10 +496,16 @@ function StepPlatformId({
           <button
             onClick={async () => {
               if (!workerId) return;
+              setError(null);
               setSaving(true);
-              await apiUpdateWorker(workerId, { partner_id: partnerId });
-              setSaving(false);
-              onNext({ platform, partnerId });
+              try {
+                await apiUpdateWorker(workerId, { partner_id: partnerId });
+                onNext({ platform, partnerId });
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Unable to save partner ID");
+              } finally {
+                setSaving(false);
+              }
             }}
             disabled={saving}
             className="w-full py-4 rounded-xl bg-primary text-white font-bold"

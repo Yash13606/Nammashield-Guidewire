@@ -66,6 +66,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (error) {
       console.error("Demo login failed:", error);
       set({ isLoading: false });
+      throw error;
     }
   },
 
