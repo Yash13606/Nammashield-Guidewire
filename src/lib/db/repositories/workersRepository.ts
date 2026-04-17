@@ -240,25 +240,12 @@ export async function updateWorkerProfile(
   const setClauses = entries.map(([key], index) => `${key} = $${index + 2}`).join(", ");
   const params = [workerId, ...entries.map(([, value]) => value)];
 
-  return queryMaybeOne<WorkerProfileRow>(
+  await execute(
     `UPDATE workers
      SET ${setClauses}
-     WHERE id = $1
-     RETURNING
-       id,
-       phone,
-       name,
-       partner_id,
-       city,
-       zone,
-      preferred_language,
-      emergency_contact_name,
-      emergency_contact_phone,
-       device_fingerprint,
-       COALESCE(wallet_balance, 0)::float8 AS wallet_balance,
-       COALESCE(streak_weeks, 0)::int4 AS streak_weeks,
-       COALESCE(is_onboarded, false) AS is_onboarded,
-       created_at::text AS created_at`,
+     WHERE id = $1`,
     params
   );
+
+  return getWorkerById(workerId);
 }
