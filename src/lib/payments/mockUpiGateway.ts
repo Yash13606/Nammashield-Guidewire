@@ -6,6 +6,41 @@ type GatewayAttempt = {
   failureMessage?: string;
 };
 
+export type MockPayoutChannel = "UPI_SIM" | "RAZORPAY_TEST" | "STRIPE_TEST";
+
+const CHANNEL_CONFIG: Record<
+  MockPayoutChannel,
+  {
+    gateway: "upi_simulator" | "razorpay_test" | "stripe_sandbox";
+    failRateEnv: string;
+    failureCode: string;
+    failureMessage: string;
+    providerRefPrefix: string;
+  }
+> = {
+  UPI_SIM: {
+    gateway: "upi_simulator",
+    failRateEnv: "MOCK_UPI_FAIL_RATE",
+    failureCode: "UPI_SIM_GATEWAY_FAILURE",
+    failureMessage: "Simulated UPI transfer failure from mock gateway",
+    providerRefPrefix: "UPI_SIM",
+  },
+  RAZORPAY_TEST: {
+    gateway: "razorpay_test",
+    failRateEnv: "MOCK_RAZORPAY_FAIL_RATE",
+    failureCode: "RAZORPAY_TEST_FAILURE",
+    failureMessage: "Simulated Razorpay test payout failure",
+    providerRefPrefix: "RZP_TEST",
+  },
+  STRIPE_TEST: {
+    gateway: "stripe_sandbox",
+    failRateEnv: "MOCK_STRIPE_FAIL_RATE",
+    failureCode: "STRIPE_TEST_FAILURE",
+    failureMessage: "Simulated Stripe sandbox payout failure",
+    providerRefPrefix: "STRIPE_TEST",
+  },
+};
+
 function hashUnit(seed: string) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) {
@@ -19,30 +54,33 @@ function simulateGatewayAttempt(input: {
   workerId: string;
   amount: number;
   attempt: number;
+  channel: MockPayoutChannel;
 }): GatewayAttempt {
-  const failRate = Number(process.env.MOCK_UPI_FAIL_RATE ?? 0.15);
-  const seed = `${input.claimId}|${input.workerId}|${input.amount}|${input.attempt}`;
+  const cfg = CHANNEL_CONFIG[input.channel];
+  const failRate = Number(process.env[cfg.failRateEnv] ?? 0.15);
+  const seed = `${input.claimId}|${input.workerId}|${input.amount}|${input.attempt}|${input.channel}`;
   const u = hashUnit(seed);
   const success = u > failRate;
   if (success) {
     return {
       attempt: input.attempt,
       success: true,
-      providerRef: `UPI_SIM_${Date.now()}_${Math.floor(u * 1_000_000)}`,
+      providerRef: `${cfg.providerRefPrefix}_${Date.now()}_${Math.floor(u * 1_000_000)}`,
     };
   }
   return {
     attempt: input.attempt,
     success: false,
-    failureCode: "UPI_SIM_GATEWAY_FAILURE",
-    failureMessage: "Simulated UPI transfer failure from mock gateway",
+    failureCode: cfg.failureCode,
+    failureMessage: cfg.failureMessage,
   };
 }
 
-export async function executeMockUpiPayout(params: {
+export async function executeMockPayout(params: {
   claimId: string;
   workerId: string;
   amount: number;
+  channel?: MockPayoutChannel;
   maxAttempts?: number;
 }): Promise<{
   success: boolean;
@@ -51,9 +89,11 @@ export async function executeMockUpiPayout(params: {
   failureCode?: string;
   failureMessage?: string;
   processedAt: string;
-  channel: "UPI_SIM";
-  gateway: "upi_simulator";
+  channel: MockPayoutChannel;
+  gateway: "upi_simulator" | "razorpay_test" | "stripe_sandbox";
 }> {
+  const channel = params.channel ?? "UPI_SIM";
+  const cfg = CHANNEL_CONFIG[channel];
   const maxAttempts = Math.max(1, params.maxAttempts ?? 3);
   let attempts = 0;
   let lastFailureCode: string | undefined;
@@ -66,6 +106,7 @@ export async function executeMockUpiPayout(params: {
       workerId: params.workerId,
       amount: params.amount,
       attempt: i,
+      channel,
     });
     if (attempt.success) {
       return {
@@ -73,8 +114,8 @@ export async function executeMockUpiPayout(params: {
         attempts,
         providerRef: attempt.providerRef,
         processedAt: new Date().toISOString(),
-        channel: "UPI_SIM",
-        gateway: "upi_simulator",
+        channel,
+        gateway: cfg.gateway,
       };
     }
     lastFailureCode = attempt.failureCode;
@@ -84,10 +125,10 @@ export async function executeMockUpiPayout(params: {
   return {
     success: false,
     attempts,
-    failureCode: lastFailureCode ?? "UPI_SIM_UNKNOWN",
+    failureCode: lastFailureCode ?? `${channel}_UNKNOWN`,
     failureMessage: lastFailureMessage ?? "Unknown mock payout failure",
     processedAt: new Date().toISOString(),
-    channel: "UPI_SIM",
-    gateway: "upi_simulator",
+    channel,
+    gateway: cfg.gateway,
   };
 }

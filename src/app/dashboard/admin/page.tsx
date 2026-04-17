@@ -183,6 +183,7 @@ export default function AdminPage() {
   const [zone, setZone] = useState("");
   const [severity, setSeverity] = useState("severe");
   const [durationHours, setDurationHours] = useState(5);
+  const [paymentChannel, setPaymentChannel] = useState("UPI_SIM");
 
   const cityZones = city ? ZONES[city as keyof typeof ZONES] ?? [] : [];
 
@@ -278,7 +279,15 @@ export default function AdminPage() {
       const res = await fetch("/api/triggers/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event_type: eventType, city, zone, severity, duration_hours: durationHours, threshold_value: 1 }),
+        body: JSON.stringify({
+          event_type: eventType,
+          city,
+          zone,
+          severity,
+          duration_hours: durationHours,
+          threshold_value: 1,
+          payment_channel: paymentChannel,
+        }),
       });
       const j = await res.json();
       setSimResult(j);
@@ -629,6 +638,13 @@ export default function AdminPage() {
             { label: "Duration (hours)", el: (
               <input type="number" min={0.5} step={0.5} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className={inputClass} />
             )},
+            { label: "Payout Gateway", el: (
+              <select value={paymentChannel} onChange={(e) => setPaymentChannel(e.target.value)} className={inputClass}>
+                <option value="UPI_SIM">UPI Simulator</option>
+                <option value="RAZORPAY_TEST">Razorpay Test Mode</option>
+                <option value="STRIPE_TEST">Stripe Sandbox</option>
+              </select>
+            )},
           ].map(({ label, el }) => (
             <div key={label}>
               <label className="block text-xs mb-1.5 font-medium" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.6875rem" }}>
@@ -681,7 +697,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
                   { label: "Workers Affected", value: String((simResult as { affected_workers?: unknown }).affected_workers ?? (simResult as { workers_found?: unknown }).workers_found ?? "—") },
-                  { label: "Claims Created", value: String((simResult as { claims_created?: unknown }).claims_created ?? "—") },
+                  { label: "Claims Created", value: String((simResult as { claims_created?: unknown }).claims_created ?? (simResult as { auto_approved?: unknown; watchlist?: unknown; flagged?: unknown; rejected?: unknown }).auto_approved ? Number((simResult as { auto_approved?: unknown; watchlist?: unknown; flagged?: unknown; rejected?: unknown }).auto_approved ?? 0) + Number((simResult as { auto_approved?: unknown; watchlist?: unknown; flagged?: unknown; rejected?: unknown }).watchlist ?? 0) + Number((simResult as { auto_approved?: unknown; watchlist?: unknown; flagged?: unknown; rejected?: unknown }).flagged ?? 0) + Number((simResult as { auto_approved?: unknown; watchlist?: unknown; flagged?: unknown; rejected?: unknown }).rejected ?? 0) : "—") },
                   { label: "Total Payout", value: (simResult as { total_payout?: unknown }).total_payout ? `₹${Number((simResult as { total_payout?: unknown }).total_payout).toLocaleString("en-IN")}` : "—" },
                 ].map(({ label, value }) => (
                   <div key={label}>
@@ -690,6 +706,46 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+              {((simResult as { payment_simulation?: unknown }).payment_simulation as
+                | {
+                    channel?: string;
+                    gateway?: string;
+                    successful_payouts?: number;
+                    failed_payouts?: number;
+                    total_requested?: number;
+                    total_credited?: number;
+                  }
+                | undefined) && (
+                <div
+                  className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-lg p-3"
+                  style={{ background: "rgba(255,255,255,0.62)", border: "1px solid rgba(22,163,74,0.2)" }}
+                >
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#166534" }}>
+                      Gateway
+                    </p>
+                    <p className="text-sm font-semibold" style={{ color: "#14532D" }}>
+                      {String(((simResult as { payment_simulation?: { gateway?: string } }).payment_simulation?.gateway ?? "upi_simulator")).replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#166534" }}>
+                      Success / Failed
+                    </p>
+                    <p className="text-sm font-semibold" style={{ color: "#14532D" }}>
+                      {Number((simResult as { payment_simulation?: { successful_payouts?: number } }).payment_simulation?.successful_payouts ?? 0)} / {Number((simResult as { payment_simulation?: { failed_payouts?: number } }).payment_simulation?.failed_payouts ?? 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#166534" }}>
+                      Credited
+                    </p>
+                    <p className="text-sm font-semibold" style={{ color: "#14532D" }}>
+                      ₹{Number((simResult as { payment_simulation?: { total_credited?: number } }).payment_simulation?.total_credited ?? 0).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+              )}
             )}
           </motion.div>
         )}

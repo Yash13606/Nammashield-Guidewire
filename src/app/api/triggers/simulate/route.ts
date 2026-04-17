@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processClaimsForTrigger } from "@/lib/claims/claimsEngine";
 import { createTriggerEvent } from "@/lib/db/repositories/triggersRepository";
+import type { MockPayoutChannel } from "@/lib/payments/mockUpiGateway";
+
+const ALLOWED_PAYOUT_CHANNELS: MockPayoutChannel[] = ["UPI_SIM", "RAZORPAY_TEST", "STRIPE_TEST"];
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,6 +14,7 @@ export async function POST(req: NextRequest) {
       severity?: string;
       threshold_value?: number;
       duration_hours?: number;
+      payment_channel?: MockPayoutChannel;
     };
 
     const {
@@ -20,11 +24,19 @@ export async function POST(req: NextRequest) {
       severity = "moderate",
       threshold_value = 0,
       duration_hours = 5,
+      payment_channel = "UPI_SIM",
     } = body;
 
     if (!event_type || !city || !zone) {
       return NextResponse.json(
         { error: "event_type, city, and zone are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!ALLOWED_PAYOUT_CHANNELS.includes(payment_channel)) {
+      return NextResponse.json(
+        { error: "payment_channel must be one of UPI_SIM, RAZORPAY_TEST, STRIPE_TEST" },
         { status: 400 }
       );
     }
@@ -50,10 +62,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "insert failed" }, { status: 500 });
     }
 
-    const summary = await processClaimsForTrigger(trigger.id);
+    const summary = await processClaimsForTrigger(trigger.id, {
+      payoutChannel: payment_channel,
+    });
 
     return NextResponse.json({
       trigger,
+      workers_found: summary.affected,
+      affected_workers: summary.affected,
+      claims_created: summary.claims_created,
       affected: summary.affected,
       total_payout: summary.total_payout,
       auto_approved: summary.auto_approved,
@@ -61,6 +78,7 @@ export async function POST(req: NextRequest) {
       flagged: summary.flagged,
       rejected: summary.rejected,
       payout_failed: summary.payout_failed,
+      payment_simulation: summary.payout_simulation,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";

@@ -1,4 +1,4 @@
-import { executeMockUpiPayout } from "./mockUpiGateway";
+import { executeMockPayout, type MockPayoutChannel } from "./mockUpiGateway";
 import {
   createPayoutTransaction,
   insertPayoutLog,
@@ -20,17 +20,24 @@ export async function processPayoutForClaim(params: {
   claimId: string;
   workerId: string;
   amount: number;
+  channel?: MockPayoutChannel;
 }) {
-  const { claimId, workerId, amount } = params;
+  const { claimId, workerId, amount, channel = "UPI_SIM" } = params;
   const notificationPrefs = await getWorkerNotificationPreferences(workerId);
+
+  const gatewayByChannel: Record<MockPayoutChannel, "upi_simulator" | "razorpay_test" | "stripe_sandbox"> = {
+    UPI_SIM: "upi_simulator",
+    RAZORPAY_TEST: "razorpay_test",
+    STRIPE_TEST: "stripe_sandbox",
+  };
 
   const txRow = await createPayoutTransaction({
       claim_id: claimId,
       worker_id: workerId,
       amount,
       status: "pending",
-      gateway: "upi_simulator",
-      channel: "UPI_SIM",
+      gateway: gatewayByChannel[channel],
+      channel,
       retry_count: 0,
     });
 
@@ -40,10 +47,11 @@ export async function processPayoutForClaim(params: {
 
   await updateClaimPayoutProcessing(claimId);
 
-  const gateway = await executeMockUpiPayout({
+  const gateway = await executeMockPayout({
     claimId,
     workerId,
     amount,
+    channel,
     maxAttempts: 3,
   });
 
@@ -125,6 +133,7 @@ export async function processPayoutForClaim(params: {
     ok: true,
     payoutAmount: amount,
     walletBalanceAfter: next,
+    gateway: gateway.gateway,
     channel: gateway.channel,
     processedAt: gateway.processedAt,
   };

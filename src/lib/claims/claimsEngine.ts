@@ -2,6 +2,7 @@ import { calculateActiveScore } from "./activeScore";
 import { calculatePayout } from "./payoutCalc";
 import { evaluateClaimFraud } from "@/lib/fraud/anomalyScoring";
 import { processPayoutForClaim } from "@/lib/payments/payoutProcessor";
+import type { MockPayoutChannel } from "@/lib/payments/mockUpiGateway";
 import { getTriggerEventById } from "@/lib/db/repositories/triggersRepository";
 import { getWorkersByCityZone } from "@/lib/db/repositories/workersRepository";
 import { getActivePoliciesByWorkerIds } from "@/lib/db/repositories/policiesRepository";
@@ -14,17 +15,34 @@ import { createWorkerNotification, getWorkerNotificationPreferences } from "@/li
 
 export type ClaimsSummary = {
   affected: number;
+  claims_created: number;
   total_payout: number;
   auto_approved: number;
   watchlist: number;
   flagged: number;
   rejected: number;
   payout_failed: number;
+  payout_simulation: {
+    channel: MockPayoutChannel;
+    gateway: "upi_simulator" | "razorpay_test" | "stripe_sandbox";
+    successful_payouts: number;
+    failed_payouts: number;
+    total_requested: number;
+    total_credited: number;
+  };
 };
 
 export async function processClaimsForTrigger(
-  triggerEventId: string
+  triggerEventId: string,
+  options?: { payoutChannel?: MockPayoutChannel }
 ): Promise<ClaimsSummary> {
+  const payoutChannel = options?.payoutChannel ?? "UPI_SIM";
+  const gatewayByChannel: Record<MockPayoutChannel, "upi_simulator" | "razorpay_test" | "stripe_sandbox"> = {
+    UPI_SIM: "upi_simulator",
+    RAZORPAY_TEST: "razorpay_test",
+    STRIPE_TEST: "stripe_sandbox",
+  };
+
   const ev = await getTriggerEventById(triggerEventId);
   if (!ev) {
     throw new Error("Trigger event not found");
@@ -43,12 +61,21 @@ export async function processClaimsForTrigger(
   if (!workers.length) {
     return {
       affected: 0,
+      claims_created: 0,
       total_payout: 0,
       auto_approved: 0,
       watchlist: 0,
       flagged: 0,
       rejected: 0,
       payout_failed: 0,
+      payout_simulation: {
+        channel: payoutChannel,
+        gateway: gatewayByChannel[payoutChannel],
+        successful_payouts: 0,
+        failed_payouts: 0,
+        total_requested: 0,
+        total_credited: 0,
+      },
     };
   }
 
@@ -57,21 +84,34 @@ export async function processClaimsForTrigger(
   if (!policies.length) {
     return {
       affected: 0,
+      claims_created: 0,
       total_payout: 0,
       auto_approved: 0,
       watchlist: 0,
       flagged: 0,
       rejected: 0,
       payout_failed: 0,
+      payout_simulation: {
+        channel: payoutChannel,
+        gateway: gatewayByChannel[payoutChannel],
+        successful_payouts: 0,
+        failed_payouts: 0,
+        total_requested: 0,
+        total_credited: 0,
+      },
     };
   }
 
+  let claims_created = 0;
   let total_payout = 0;
   let auto_approved = 0;
   let watchlist = 0;
   let flagged = 0;
   let rejected = 0;
   let payout_failed = 0;
+  let payout_success_count = 0;
+  let payout_failure_count = 0;
+  let total_requested = 0;
 
   for (const pol of policies) {
     const workerId = pol.worker_id as string;
@@ -128,6 +168,9 @@ export async function processClaimsForTrigger(
     }
 
     const payoutAmount = status === "auto_approved" ? finalPayout : 0;
+    if (status === "auto_approved" && payoutAmount > 0) {
+      total_requested += payoutAmount;
+    }
 
     const claimRow = await createClaim({
         worker_id: workerId,
@@ -145,6 +188,7 @@ export async function processClaimsForTrigger(
       });
 
     if (!claimRow) continue;
+  claims_created += 1;
 
     const notificationPrefs = await getWorkerNotificationPreferences(workerId);
     if (notificationPrefs?.trigger_enabled !== false) {
@@ -182,12 +226,15 @@ export async function processClaimsForTrigger(
         claimId: claimRow.id as string,
         workerId,
         amount: payoutAmount,
+        channel: payoutChannel,
       });
       if (payout.ok) {
         total_payout += payoutAmount;
+        payout_success_count += 1;
       } else {
         auto_approved -= 1;
         payout_failed += 1;
+        payout_failure_count += 1;
       }
     } else if (notificationPrefs?.fraud_enabled !== false) {
       if (status === "flagged" || status === "watchlist" || status === "rejected") {
@@ -208,11 +255,20 @@ export async function processClaimsForTrigger(
 
   return {
     affected: policies.length,
+    claims_created,
     total_payout: Math.round(total_payout * 100) / 100,
     auto_approved,
     watchlist,
     flagged,
     rejected,
     payout_failed,
+    payout_simulation: {
+      channel: payoutChannel,
+      gateway: gatewayByChannel[payoutChannel],
+      successful_payouts: payout_success_count,
+      failed_payouts: payout_failure_count,
+      total_requested: Math.round(total_requested * 100) / 100,
+      total_credited: Math.round(total_payout * 100) / 100,
+    },
   };
 }
