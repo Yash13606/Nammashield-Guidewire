@@ -1,5 +1,42 @@
 import { execute, queryMaybeOne, queryRows } from "@/lib/db/postgres";
 
+const tableExistsCache = new Map<string, boolean>();
+
+async function tableExists(tableName: string) {
+  const cached = tableExistsCache.get(tableName);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const row = await queryMaybeOne<{ exists: boolean }>(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = current_schema()
+        AND table_name = $1
+    ) AS exists`,
+    [tableName]
+  );
+
+  const exists = Boolean(row?.exists);
+  tableExistsCache.set(tableName, exists);
+  return exists;
+}
+
+function defaultPrefs(workerId: string): WorkerNotificationPreferenceRow {
+  const now = new Date().toISOString();
+  return {
+    worker_id: workerId,
+    push_enabled: true,
+    payout_enabled: true,
+    trigger_enabled: true,
+    fraud_enabled: true,
+    profile_updates_enabled: true,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
 export type WorkerNotificationRow = {
   id: string;
   worker_id: string;
@@ -24,6 +61,9 @@ export type WorkerNotificationPreferenceRow = {
 };
 
 export async function ensureWorkerNotificationPreferences(workerId: string) {
+  const hasPrefsTable = await tableExists("worker_notification_preferences");
+  if (!hasPrefsTable) return;
+
   await execute(
     `INSERT INTO worker_notification_preferences (worker_id)
      VALUES ($1)
@@ -33,6 +73,11 @@ export async function ensureWorkerNotificationPreferences(workerId: string) {
 }
 
 export async function getWorkerNotificationPreferences(workerId: string) {
+  const hasPrefsTable = await tableExists("worker_notification_preferences");
+  if (!hasPrefsTable) {
+    return defaultPrefs(workerId);
+  }
+
   await ensureWorkerNotificationPreferences(workerId);
   return queryMaybeOne<WorkerNotificationPreferenceRow>(
     `SELECT
@@ -59,6 +104,15 @@ export async function updateWorkerNotificationPreferences(
     >
   >
 ) {
+  const hasPrefsTable = await tableExists("worker_notification_preferences");
+  if (!hasPrefsTable) {
+    return {
+      ...defaultPrefs(workerId),
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
   await ensureWorkerNotificationPreferences(workerId);
 
   const allowed = new Set([
@@ -103,6 +157,11 @@ export async function createWorkerNotification(input: {
   message: string;
   metadata?: Record<string, unknown>;
 }) {
+  const hasNotificationsTable = await tableExists("worker_notifications");
+  if (!hasNotificationsTable) {
+    return null;
+  }
+
   return queryMaybeOne<{ id: string }>(
     `INSERT INTO worker_notifications (
       worker_id, category, title, message, metadata
@@ -123,6 +182,11 @@ export async function listWorkerNotifications(input: {
   limit?: number;
   unreadOnly?: boolean;
 }) {
+  const hasNotificationsTable = await tableExists("worker_notifications");
+  if (!hasNotificationsTable) {
+    return [] as WorkerNotificationRow[];
+  }
+
   const limit = input.limit && Number.isFinite(input.limit) && input.limit > 0 ? input.limit : 30;
 
   return queryRows<WorkerNotificationRow>(
@@ -146,6 +210,11 @@ export async function listWorkerNotifications(input: {
 }
 
 export async function countUnreadWorkerNotifications(workerId: string) {
+  const hasNotificationsTable = await tableExists("worker_notifications");
+  if (!hasNotificationsTable) {
+    return 0;
+  }
+
   const row = await queryMaybeOne<{ count: string }>(
     `SELECT COUNT(*)::text AS count
      FROM worker_notifications
@@ -158,6 +227,11 @@ export async function countUnreadWorkerNotifications(workerId: string) {
 }
 
 export async function markWorkerNotificationRead(workerId: string, notificationId: string) {
+  const hasNotificationsTable = await tableExists("worker_notifications");
+  if (!hasNotificationsTable) {
+    return;
+  }
+
   return execute(
     `UPDATE worker_notifications
      SET is_read = true,
@@ -169,6 +243,11 @@ export async function markWorkerNotificationRead(workerId: string, notificationI
 }
 
 export async function markAllWorkerNotificationsRead(workerId: string) {
+  const hasNotificationsTable = await tableExists("worker_notifications");
+  if (!hasNotificationsTable) {
+    return;
+  }
+
   return execute(
     `UPDATE worker_notifications
      SET is_read = true,
