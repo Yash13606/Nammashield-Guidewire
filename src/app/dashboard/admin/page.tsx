@@ -695,6 +695,14 @@ export default function AdminPage() {
               </div>
             ) : (
               <>
+                {((simResult as { message?: string }).message || (simResult as { city_fallback_used?: boolean }).city_fallback_used) && (
+                  <p className="mb-3 text-xs" style={{ color: "#166534" }}>
+                    {(simResult as { message?: string }).message ??
+                      ((simResult as { city_fallback_used?: boolean }).city_fallback_used
+                        ? "No exact zone match found; city-level fallback was used."
+                        : "")}
+                  </p>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {[
                     {

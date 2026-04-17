@@ -4,7 +4,7 @@ import { evaluateClaimFraud } from "@/lib/fraud/anomalyScoring";
 import { processPayoutForClaim } from "@/lib/payments/payoutProcessor";
 import type { MockPayoutChannel } from "@/lib/payments/mockUpiGateway";
 import { getTriggerEventById } from "@/lib/db/repositories/triggersRepository";
-import { getWorkersByCityZone } from "@/lib/db/repositories/workersRepository";
+import { getWorkersByCity, getWorkersByCityZone } from "@/lib/db/repositories/workersRepository";
 import { getActivePoliciesByWorkerIds } from "@/lib/db/repositories/policiesRepository";
 import {
   claimExistsForWorkerPolicyTrigger,
@@ -22,6 +22,7 @@ export type ClaimsSummary = {
   flagged: number;
   rejected: number;
   payout_failed: number;
+  city_fallback_used: boolean;
   payout_simulation: {
     channel: MockPayoutChannel;
     gateway: "upi_simulator" | "razorpay_test" | "stripe_sandbox";
@@ -57,7 +58,12 @@ export async function processClaimsForTrigger(
     (end - start) / (1000 * 60 * 60)
   );
 
-  const workers = await getWorkersByCityZone(ev.city, ev.zone);
+  let city_fallback_used = false;
+  let workers = await getWorkersByCityZone(ev.city, ev.zone);
+  if (!workers.length && Boolean(ev.is_simulated)) {
+    workers = await getWorkersByCity(ev.city);
+    city_fallback_used = workers.length > 0;
+  }
   if (!workers.length) {
     return {
       affected: 0,
@@ -68,6 +74,7 @@ export async function processClaimsForTrigger(
       flagged: 0,
       rejected: 0,
       payout_failed: 0,
+      city_fallback_used,
       payout_simulation: {
         channel: payoutChannel,
         gateway: gatewayByChannel[payoutChannel],
@@ -91,6 +98,7 @@ export async function processClaimsForTrigger(
       flagged: 0,
       rejected: 0,
       payout_failed: 0,
+      city_fallback_used,
       payout_simulation: {
         channel: payoutChannel,
         gateway: gatewayByChannel[payoutChannel],
@@ -262,6 +270,7 @@ export async function processClaimsForTrigger(
     flagged,
     rejected,
     payout_failed,
+    city_fallback_used,
     payout_simulation: {
       channel: payoutChannel,
       gateway: gatewayByChannel[payoutChannel],

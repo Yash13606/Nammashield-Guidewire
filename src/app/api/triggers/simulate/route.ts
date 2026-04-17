@@ -71,6 +71,13 @@ export async function POST(req: NextRequest) {
       workers_found: summary.affected,
       affected_workers: summary.affected,
       claims_created: summary.claims_created,
+      city_fallback_used: summary.city_fallback_used,
+      message:
+        summary.affected === 0
+          ? "No active workers/policies matched this simulation."
+          : summary.city_fallback_used
+            ? "No exact zone match found; used city-level worker fallback for simulation."
+            : "Simulation completed with exact zone match.",
       affected: summary.affected,
       total_payout: summary.total_payout,
       auto_approved: summary.auto_approved,

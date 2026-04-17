@@ -70,6 +70,15 @@ export async function getWorkersByCityZone(city: string, zone: string) {
   );
 }
 
+export async function getWorkersByCity(city: string) {
+  return queryRows<{ id: string; city: string; zone: string }>(
+    `SELECT id, city, zone
+     FROM workers
+     WHERE lower(city) = lower($1)`,
+    [city]
+  );
+}
+
 export async function getWorkerById(workerId: string) {
   const hasPreferredLanguage = await workerColumnExists("preferred_language");
   const hasEmergencyContactName = await workerColumnExists("emergency_contact_name");
