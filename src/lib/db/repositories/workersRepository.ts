@@ -29,7 +29,10 @@ export type WorkerProfileRow = {
 
 export async function getWorkersByCityZone(city: string, zone: string) {
   return queryRows<{ id: string; city: string; zone: string }>(
-    "SELECT id, city, zone FROM workers WHERE city = $1 AND zone = $2",
+    `SELECT id, city, zone
+     FROM workers
+     WHERE lower(city) = lower($1)
+       AND regexp_replace(lower(zone), '[^a-z0-9]+', '', 'g') = regexp_replace(lower($2), '[^a-z0-9]+', '', 'g')`,
     [city, zone]
   );
 }

@@ -97,3 +97,41 @@ export async function listAllPayoutRows() {
     "SELECT COALESCE(amount, 0)::float8 AS amount, worker_id FROM payout_log"
   );
 }
+
+export async function listPayoutTransactionsSince(input: {
+  since: string;
+  limit?: number;
+}) {
+  const limit = input.limit && Number.isFinite(input.limit) && input.limit > 0 ? input.limit : 20;
+
+  return queryRows<{
+    id: string;
+    claim_id: string;
+    worker_id: string;
+    worker_phone: string | null;
+    amount: number;
+    status: string;
+    channel: string;
+    failure_message: string | null;
+    requested_at: string;
+    processed_at: string | null;
+  }>(
+    `SELECT
+      pt.id,
+      pt.claim_id,
+      pt.worker_id,
+      w.phone AS worker_phone,
+      COALESCE(pt.amount, 0)::float8 AS amount,
+      pt.status,
+      pt.channel,
+      pt.failure_message,
+      pt.requested_at::text AS requested_at,
+      pt.processed_at::text AS processed_at
+     FROM payout_transactions pt
+     LEFT JOIN workers w ON w.id = pt.worker_id
+     WHERE COALESCE(pt.processed_at, pt.requested_at) > $1
+     ORDER BY COALESCE(pt.processed_at, pt.requested_at) ASC
+     LIMIT $2`,
+    [input.since, limit]
+  );
+}

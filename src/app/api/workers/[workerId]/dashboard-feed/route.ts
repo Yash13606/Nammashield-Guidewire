@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listClaimsForWorker, sumPayoutAmountsForWorkerPolicy } from "@/lib/db/repositories/claimsRepository";
+import {
+  listClaimsForWorker,
+  sumPayoutAmountsForWorker,
+  sumPayoutAmountsForWorkerPolicy,
+} from "@/lib/db/repositories/claimsRepository";
 import { listRecentTriggersByCity } from "@/lib/db/repositories/triggersRepository";
 
 type Params = { params: { workerId: string } | Promise<{ workerId: string }> };
@@ -14,12 +18,13 @@ export async function GET(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "city query param required" }, { status: 400 });
     }
 
-    const [triggers, recentClaims] = await Promise.all([
+    const [triggers, recentClaims, lifetimeProtected] = await Promise.all([
       listRecentTriggersByCity(city, 5),
       listClaimsForWorker({
         workerId,
         limit: 5,
       }),
+      sumPayoutAmountsForWorker(workerId),
     ]);
 
     let coverageUsed = 0;
@@ -37,6 +42,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         trigger_events: row.trigger_event_type ? { event_type: row.trigger_event_type } : null,
       })),
       coverageUsed,
+      lifetimeProtected,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "error";

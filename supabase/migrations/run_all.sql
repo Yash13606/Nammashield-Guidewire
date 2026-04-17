@@ -133,11 +133,6 @@ INSERT INTO zones (city, zone_name, lat_min, lat_max, lng_min, lng_max, historic
   ('Bengaluru', 'Zone 11 — Indiranagar',   12.9700, 12.9850, 77.6300, 77.6500, 0.38, 3800, 5000),
   ('Bengaluru', 'Zone 12 — HSR Layout',    12.9050, 12.9250, 77.6300, 77.6550, 0.45, 3800, 5000);
 
--- ─── Enable Realtime on key tables ─────────────────
-ALTER PUBLICATION supabase_realtime ADD TABLE workers;
-ALTER PUBLICATION supabase_realtime ADD TABLE claims;
-ALTER PUBLICATION supabase_realtime ADD TABLE payout_log;
-
 -- ─── Row Level Security (permissive for demo) ──────
 ALTER TABLE workers ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all for anon" ON workers FOR ALL USING (true) WITH CHECK (true);

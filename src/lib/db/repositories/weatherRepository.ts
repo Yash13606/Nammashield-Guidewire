@@ -7,7 +7,11 @@ export async function getZoneBounds(city: string, zone: string) {
     lng_min: number;
     lng_max: number;
   }>(
-    "SELECT lat_min::float8, lat_max::float8, lng_min::float8, lng_max::float8 FROM zones WHERE city = $1 AND zone_name = $2 LIMIT 1",
+    `SELECT lat_min::float8, lat_max::float8, lng_min::float8, lng_max::float8
+     FROM zones
+     WHERE lower(city) = lower($1)
+       AND regexp_replace(lower(zone_name), '[^a-z0-9]+', '', 'g') = regexp_replace(lower($2), '[^a-z0-9]+', '', 'g')
+     LIMIT 1`,
     [city, zone]
   );
 }
@@ -63,7 +67,9 @@ export async function getWeatherObservationsWindow(params: {
     }>(
       `SELECT rain_mm::float8, condition_text, observed_at::text AS observed_at, pincode
        FROM weather_observations
-       WHERE city = $1 AND zone = $2 AND observed_at >= $3 AND observed_at <= $4 AND pincode = $5`,
+       WHERE lower(city) = lower($1)
+         AND regexp_replace(lower(zone), '[^a-z0-9]+', '', 'g') = regexp_replace(lower($2), '[^a-z0-9]+', '', 'g')
+         AND observed_at >= $3 AND observed_at <= $4 AND pincode = $5`,
       [params.city, params.zone, params.from, params.to, params.pincode]
     );
   }
@@ -76,7 +82,9 @@ export async function getWeatherObservationsWindow(params: {
   }>(
     `SELECT rain_mm::float8, condition_text, observed_at::text AS observed_at, pincode
      FROM weather_observations
-     WHERE city = $1 AND zone = $2 AND observed_at >= $3 AND observed_at <= $4`,
+     WHERE lower(city) = lower($1)
+       AND regexp_replace(lower(zone), '[^a-z0-9]+', '', 'g') = regexp_replace(lower($2), '[^a-z0-9]+', '', 'g')
+       AND observed_at >= $3 AND observed_at <= $4`,
     [params.city, params.zone, params.from, params.to]
   );
 }

@@ -16,7 +16,12 @@ import { Logo } from "@/components/namma/Logo";
 import { useAuthStore } from "@/lib/authStore";
 import { ZONES, PLANS } from "@/lib/mockData";
 import { useRouter } from "next/navigation";
-import { apiActivateOnboardingPolicy, apiUpdateWorker } from "@/lib/api/client";
+import {
+  apiActivateOnboardingPolicy,
+  apiGetRiskQuote,
+  apiUpdateWorker,
+  apiVerifyPartnerMock,
+} from "@/lib/api/client";
 
 /* ─── Animation Config ─── */
 const slideVariants = {
@@ -386,11 +391,24 @@ function StepPlatformId({
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState<"upload" | "scanning" | "verified">("upload");
   const [platform, setPlatform] = useState("");
+  const [partnerId, setPartnerId] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
+    setError(null);
     setState("scanning");
-    setPlatform("Swiggy");
-    setTimeout(() => setState("verified"), 2000);
+    try {
+      const verified = await apiVerifyPartnerMock({
+        platform: "Swiggy",
+        screenshot_name: "platform-id.png",
+      });
+      setPlatform(verified.platform);
+      setPartnerId(verified.partnerId);
+      setState("verified");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to verify partner ID");
+      setState("upload");
+    }
   };
 
   return (
@@ -434,16 +452,16 @@ function StepPlatformId({
              <Check className="text-accent" />
              <div>
                <p className="font-bold">Verified: {platform}</p>
-               <p className="text-xs opacity-70">Partner ID: SWG-48721</p>
+              <p className="text-xs opacity-70">Partner ID: {partnerId}</p>
              </div>
           </div>
           <button
             onClick={async () => {
               if (!workerId) return;
               setSaving(true);
-              await apiUpdateWorker(workerId, { partner_id: "SWG-48721", name: platform });
+              await apiUpdateWorker(workerId, { partner_id: partnerId });
               setSaving(false);
-              onNext({ platform, partnerId: "SWG-48721" });
+              onNext({ platform, partnerId });
             }}
             disabled={saving}
             className="w-full py-4 rounded-xl bg-primary text-white font-bold"
@@ -452,6 +470,7 @@ function StepPlatformId({
           </button>
         </div>
       )}
+      {error && <p className="text-xs text-red-500 mt-3 text-center">{error}</p>}
     </motion.div>
   );
 }
@@ -512,20 +531,33 @@ function StepUPI({ onNext }: { onNext: (data: { upi: string }) => void }) {
 
 /* ─── Step 4: Location & Risk ─── */
 function StepLocation({ onNext }: { onNext: (data: { city: string; zone: string; riskScore: number }) => void }) {
+  const workerId = useAuthStore((s) => s.workerId);
   const [city, setCity] = useState("");
   const [zone, setZone] = useState("");
   const [mlLoading, setMlLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const cityZones = city ? (ZONES as Record<string, string[]>)[city] || [] : [];
 
-  const handleCalculate = () => {
+  const handleCalculate = async () => {
     if (!city || !zone) return;
+    setError(null);
     setMlLoading(true);
-    setTimeout(() => {
-      const score = Math.floor(Math.random() * 40) + 40;
+    try {
+      if (workerId) {
+        await apiUpdateWorker(workerId, { city, zone });
+      }
+      const quote = await apiGetRiskQuote({
+        city,
+        zone,
+        streak_weeks: 0,
+      });
       setMlLoading(false);
-      onNext({ city, zone, riskScore: score });
-    }, 2000);
+      onNext({ city, zone, riskScore: Math.round(quote.risk_score) });
+    } catch (e) {
+      setMlLoading(false);
+      setError(e instanceof Error ? e.message : "Unable to calculate risk for this zone");
+    }
   };
 
   return (
@@ -562,6 +594,7 @@ function StepLocation({ onNext }: { onNext: (data: { city: string; zone: string;
             {mlLoading ? "Calculating Risk..." : "Check Area Risk"}
           </button>
         )}
+        {error && <p className="text-xs text-red-500 text-center">{error}</p>}
       </div>
     </motion.div>
   );
@@ -663,9 +696,6 @@ function StepActivate({ data }: { data: any }) {
     try {
       await apiActivateOnboardingPolicy(workerId, {
         tier: data.tier,
-        weeklyPremium: data.weeklyPremium,
-        coverageAmount: data.coverageAmount,
-        riskScore: data.riskScore,
       });
       setOnboardingComplete();
       router.push("/dashboard");

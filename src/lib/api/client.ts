@@ -53,6 +53,41 @@ export function apiUpdateWorker(workerId: string, updates: Record<string, unknow
   });
 }
 
+export type RiskQuoteResponse = {
+  risk_score: number;
+  tier: "Basic" | "Standard" | "Pro" | "Surge";
+  weekly_premium: number;
+  coverage_amount: number;
+  discount_applied: boolean;
+};
+
+export function apiGetRiskQuote(payload: {
+  city: string;
+  zone: string;
+  streak_weeks?: number;
+  tier?: string;
+}) {
+  return requestJson<RiskQuoteResponse>("/api/risk/quote", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function apiVerifyPartnerMock(payload: {
+  platform: string;
+  screenshot_name?: string;
+}) {
+  return requestJson<{
+    ok: boolean;
+    platform: string;
+    partnerId: string;
+    confidence: number;
+  }>("/api/platforms/verify-partner", {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export type DashboardFeedResponse = {
   triggers: Array<{
     id: string;
@@ -70,6 +105,7 @@ export type DashboardFeedResponse = {
     trigger_events: { event_type: string } | null;
   }>;
   coverageUsed: number;
+  lifetimeProtected: number;
 };
 
 export function apiGetDashboardFeed(workerId: string, city: string, policyId?: string) {
@@ -107,7 +143,7 @@ export function apiGetWorkerClaims(
   );
 }
 
-export function apiSwitchActivePolicy(workerId: string, payload: { tier: string; weekly_premium: number; coverage_amount: number }) {
+export function apiSwitchActivePolicy(workerId: string, payload: { tier: string }) {
   return requestJson<{ ok: true }>(`/api/workers/${workerId}/policy`, {
     method: "PATCH",
     body: payload,
@@ -116,7 +152,7 @@ export function apiSwitchActivePolicy(workerId: string, payload: { tier: string;
 
 export function apiActivateOnboardingPolicy(
   workerId: string,
-  payload: { tier: string; weeklyPremium: number; coverageAmount: number; riskScore: number }
+  payload: { tier: string }
 ) {
   return requestJson<{ ok: true }>(`/api/workers/${workerId}/onboarding/activate`, {
     method: "POST",

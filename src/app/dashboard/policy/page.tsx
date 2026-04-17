@@ -343,8 +343,6 @@ function PlanComparison() {
     try {
       await apiSwitchActivePolicy(workerId, {
         tier: plan.name,
-        weekly_premium: plan.premium,
-        coverage_amount: plan.maxCoverage,
       });
 
       await refresh();

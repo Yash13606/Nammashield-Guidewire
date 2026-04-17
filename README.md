@@ -34,6 +34,7 @@ NammaShield is a **parametric income protection platform** built specifically fo
 | 🔍 **AI Fraud Detection** | ML classifier analyzes claim velocity, GPS zone coherence & device cluster data to auto-approve or flag claims |
 | ⚡ **Parametric Triggers** | Event-based automatic payouts — no claim filing required |
 | 💸 **Instant UPI Payouts** | Auto-approved claims credited directly to worker wallets |
+| 🌐 **Mock External Feeds** | CPCB AQI mock, traffic congestion mock, and social disruption mock are polled and converted into trigger events |
 | 📊 **Admin Dashboard** | Real-time zone monitoring, trigger simulation, watchlist management |
 | 🔄 **Weekly Premium Engine** | Dynamic pricing with streak-based loyalty discounts |
 | 🕐 **Cron Automation** | Automated trigger monitoring (every 15 min) and policy renewal (daily) |
@@ -88,6 +89,17 @@ NammaShield operates on a **zero-touch parametric model**. Workers never file cl
        ↓               device_cluster → auto-approve / flag / review
 7. PAYOUT       →  Instant UPI credit, proportional to disruption
 ```
+
+Pricing note:
+
+- Policy premium and coverage are computed server-side from risk signals and streak history.
+- Client-selected tier is treated as preference; backend is source-of-truth for persisted premium values.
+
+Mock integration endpoints used by the platform:
+
+- `GET /api/triggers/traffic?city=<city>&zone=<zone>`
+- `GET /api/triggers/disruptions?city=<city>&zone=<zone>`
+- `POST /api/platforms/verify-partner`
 
 ---
 

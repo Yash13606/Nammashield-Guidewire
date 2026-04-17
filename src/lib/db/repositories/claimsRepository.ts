@@ -105,6 +105,16 @@ export async function sumPayoutAmountsForWorkerPolicy(workerId: string, policyId
   return Number(row?.total ?? 0);
 }
 
+export async function sumPayoutAmountsForWorker(workerId: string) {
+  const row = await queryMaybeOne<{ total: number }>(
+    `SELECT COALESCE(SUM(payout_amount), 0)::float8 AS total
+     FROM claims
+     WHERE worker_id = $1 AND status = 'auto_approved'`,
+    [workerId]
+  );
+  return Number(row?.total ?? 0);
+}
+
 export async function getClaimStatus(claimId: string) {
   return queryMaybeOne<{ status: string }>(
     "SELECT status FROM claims WHERE id = $1",
@@ -162,6 +172,21 @@ export async function countClaimsByTrigger(triggerEventId: string) {
     [triggerEventId]
   );
   return Number(row?.count ?? 0);
+}
+
+export async function claimExistsForWorkerPolicyTrigger(input: {
+  workerId: string;
+  policyId: string;
+  triggerEventId: string;
+}) {
+  const row = await queryMaybeOne<{ id: string }>(
+    `SELECT id
+     FROM claims
+     WHERE worker_id = $1 AND policy_id = $2 AND trigger_event_id = $3
+     LIMIT 1`,
+    [input.workerId, input.policyId, input.triggerEventId]
+  );
+  return Boolean(row?.id);
 }
 
 export async function countClaimsByWorkerSince(workerId: string, sinceIso: string) {

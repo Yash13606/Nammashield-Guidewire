@@ -108,3 +108,21 @@ export async function getTriggerEventsByIds(triggerIds: string[]) {
     clause.params
   );
 }
+
+export async function hasRecentTriggerByTypeAndZone(input: {
+  eventType: string;
+  city: string;
+  zone: string;
+  windowMinutes: number;
+}) {
+  const row = await queryMaybeOne<{ count: string }>(
+    `SELECT COUNT(*)::text AS count
+     FROM trigger_events
+     WHERE event_type = $1
+       AND lower(city) = lower($2)
+       AND regexp_replace(lower(zone), '[^a-z0-9]+', '', 'g') = regexp_replace(lower($3), '[^a-z0-9]+', '', 'g')
+       AND created_at >= now() - (($4::text || ' minutes')::interval)`,
+    [input.eventType, input.city, input.zone, input.windowMinutes]
+  );
+  return Number(row?.count ?? 0) > 0;
+}

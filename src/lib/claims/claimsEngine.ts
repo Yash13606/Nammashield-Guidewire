@@ -5,7 +5,10 @@ import { processPayoutForClaim } from "@/lib/payments/payoutProcessor";
 import { getTriggerEventById } from "@/lib/db/repositories/triggersRepository";
 import { getWorkersByCityZone } from "@/lib/db/repositories/workersRepository";
 import { getActivePoliciesByWorkerIds } from "@/lib/db/repositories/policiesRepository";
-import { createClaim } from "@/lib/db/repositories/claimsRepository";
+import {
+  claimExistsForWorkerPolicyTrigger,
+  createClaim,
+} from "@/lib/db/repositories/claimsRepository";
 import { insertFraudAuditLogs } from "@/lib/db/repositories/fraudRepository";
 
 export type ClaimsSummary = {
@@ -71,6 +74,15 @@ export async function processClaimsForTrigger(
 
   for (const pol of policies) {
     const workerId = pol.worker_id as string;
+    const alreadyExists = await claimExistsForWorkerPolicyTrigger({
+      workerId,
+      policyId: pol.id,
+      triggerEventId,
+    });
+    if (alreadyExists) {
+      continue;
+    }
+
     const worker = workers.find((w) => w.id === workerId);
     const city = worker?.city || ev.city;
 

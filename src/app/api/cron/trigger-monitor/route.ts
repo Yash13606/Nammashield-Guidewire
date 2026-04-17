@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkWeatherAndMaybeInsert } from "@/lib/triggers/weatherCheck";
+import { checkDisruptionFeedsAndMaybeInsert } from "@/lib/triggers/disruptionCheck";
 import { processClaimsForTrigger } from "@/lib/claims/claimsEngine";
 import { getActivePolicyWorkerIds } from "@/lib/db/repositories/policiesRepository";
 import { getWorkersCityZoneByIds } from "@/lib/db/repositories/workersRepository";
@@ -32,12 +33,23 @@ export async function GET() {
 
   for (const { city, zone } of pairs.values()) {
     const check = await checkWeatherAndMaybeInsert(city, zone);
+    const disruptions = await checkDisruptionFeedsAndMaybeInsert(city, zone);
+
     if (check.triggered && check.trigger?.id) {
       await processClaimsForTrigger(check.trigger.id as string);
-      results.push({ city, zone, triggered: true, claim_run: true });
-    } else {
-      results.push({ city, zone, triggered: false });
     }
+
+    for (const t of disruptions.inserted) {
+      await processClaimsForTrigger(t.id);
+    }
+
+    results.push({
+      city,
+      zone,
+      triggered: check.triggered || disruptions.inserted.length > 0,
+      claim_run:
+        (check.triggered && Boolean(check.trigger?.id)) || disruptions.inserted.length > 0,
+    });
   }
 
   return NextResponse.json({ ok: true, checked: results.length, results });

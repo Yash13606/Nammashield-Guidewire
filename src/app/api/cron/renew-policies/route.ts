@@ -9,27 +9,7 @@ import {
   getWorkerRenewalDetails,
   updateWorkerStreakWeeks,
 } from "@/lib/db/repositories/workersRepository";
-
-const ML_BASE = (process.env.ML_API_URL ?? process.env.NEXT_PUBLIC_ML_API_URL ?? "").replace(/\/$/, "");
-
-async function mlRisk(city: string, zone: string, streakWeeks: number) {
-  if (!ML_BASE) {
-    return { risk_score: 45, tier: "Standard", weekly_premium: 100 };
-  }
-  const res = await fetch(`${ML_BASE}/ml/risk-score`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ city, zone, streak_weeks: streakWeeks }),
-  });
-  if (!res.ok) {
-    return { risk_score: 45, tier: "Standard", weekly_premium: 100 };
-  }
-  return (await res.json()) as {
-    risk_score: number;
-    tier: string;
-    weekly_premium: number;
-  };
-}
+import { getRiskQuote } from "@/lib/risk/riskQuote";
 
 /** Daily cron — policies expiring today get renewed; streak updated from claim history */
 export async function GET() {
@@ -57,8 +37,11 @@ export async function GET() {
       const hadClaims = (claimCount ?? 0) > 0;
       const nextStreak = hadClaims ? 0 : (worker.streak_weeks ?? 0) + 1;
 
-      const risk = await mlRisk(worker.city, worker.zone, nextStreak);
-      const coverageAmount = Math.round(Number(risk.weekly_premium) * 7);
+      const quote = await getRiskQuote({
+        city: worker.city,
+        zone: worker.zone,
+        streakWeeks: nextStreak,
+      });
 
       const start = new Date();
       const end = new Date(start);
@@ -67,10 +50,10 @@ export async function GET() {
       await expirePolicy(pol.id);
       await insertPolicy({
         worker_id: pol.worker_id,
-        tier: risk.tier,
-        weekly_premium: risk.weekly_premium,
-        coverage_amount: coverageAmount,
-        risk_score: risk.risk_score,
+        tier: quote.tier,
+        weekly_premium: quote.weekly_premium,
+        coverage_amount: quote.coverage_amount,
+        risk_score: quote.risk_score,
         start_date: start.toISOString().slice(0, 10),
         end_date: end.toISOString().slice(0, 10),
       });

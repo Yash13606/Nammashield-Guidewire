@@ -128,6 +128,7 @@ export default function DashboardPage() {
     }>
   >([]);
   const [coverageUsed, setCoverageUsed] = useState(0);
+  const [lifetimeProtected, setLifetimeProtected] = useState(0);
   const toastSeenClaimIds = useRef<Set<string>>(new Set());
   const toastCursorRef = useRef<string>(new Date().toISOString());
 
@@ -142,12 +143,14 @@ export default function DashboardPage() {
         setTriggers(feed.triggers as typeof triggers);
         setRecentClaims(feed.recentClaims as typeof recentClaims);
         setCoverageUsed(feed.coverageUsed);
+        setLifetimeProtected(feed.lifetimeProtected ?? 0);
       } catch (e) {
         if (!cancelled) {
           console.error(e);
           setTriggers([]);
           setRecentClaims([]);
           setCoverageUsed(0);
+          setLifetimeProtected(0);
         }
       }
       if (cancelled) return;
@@ -166,7 +169,6 @@ export default function DashboardPage() {
       try {
         const since = toastCursorRef.current;
         const { claims } = await apiGetWorkerClaims(workerId, {
-          status: "auto_approved",
           since,
           limit: 20,
         });
@@ -179,12 +181,23 @@ export default function DashboardPage() {
         for (const row of sorted) {
           if (toastSeenClaimIds.current.has(row.id)) continue;
           toastSeenClaimIds.current.add(row.id);
-          if (Number(row.payout_amount) <= 0) continue;
           const label = (row.trigger_events?.event_type ?? "Disruption").replace(/_/g, " ");
-          toast({
-            title: `₹${Number(row.payout_amount).toLocaleString("en-IN")} credited via UPI (Simulation)`,
-            description: `Zero-touch claim processed for ${label}.`,
-          });
+
+          if (row.status === "auto_approved" && Number(row.payout_amount) > 0) {
+            toast({
+              title: `Money received: ₹${Number(row.payout_amount).toLocaleString("en-IN")}`,
+              description: `Credited via ${(row.payout_channel ?? "UPI_SIM").replace(/_/g, " ")} for ${label}.`,
+            });
+            continue;
+          }
+
+          if (row.status === "payout_failed" || row.payout_status === "failed") {
+            toast({
+              title: "Payout failed",
+              description: row.payout_failure_reason ?? `Payment for ${label} could not be processed.`,
+              variant: "destructive",
+            });
+          }
         }
 
         toastCursorRef.current = sorted[sorted.length - 1]!.created_at;
@@ -296,6 +309,9 @@ export default function DashboardPage() {
             <p className="text-sm" style={{ color: "var(--muted)", fontFamily: "var(--font-body)" }}>
               Your <strong style={{ color: "var(--foreground)" }}>{tierLabel} Plan</strong> is active for this week
               {worker?.city ? ` · ${worker.city}${worker.zone ? `, ${worker.zone}` : ""}` : ""}
+            </p>
+            <p className="text-xs" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
+              Total earnings protected to date: ₹{Math.round(lifetimeProtected).toLocaleString("en-IN")}
             </p>
             {upcomingCoverageStart && (
               <p className="text-xs" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
