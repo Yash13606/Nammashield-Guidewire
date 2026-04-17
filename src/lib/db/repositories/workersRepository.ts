@@ -1,6 +1,36 @@
 import { execute, queryMaybeOne, queryRows } from "@/lib/db/postgres";
 import { inClause } from "./sqlHelpers";
 
+const OPTIONAL_WORKER_PROFILE_COLUMNS = [
+  "preferred_language",
+  "emergency_contact_name",
+  "emergency_contact_phone",
+] as const;
+
+const workerColumnCache = new Map<string, boolean>();
+
+async function workerColumnExists(columnName: string) {
+  const cached = workerColumnCache.get(columnName);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const row = await queryMaybeOne<{ exists: boolean }>(
+    `SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'workers'
+        AND column_name = $1
+    ) AS exists`,
+    [columnName]
+  );
+
+  const exists = Boolean(row?.exists);
+  workerColumnCache.set(columnName, exists);
+  return exists;
+}
+
 export type WorkerBasicRow = {
   id: string;
   name: string | null;
@@ -41,22 +71,34 @@ export async function getWorkersByCityZone(city: string, zone: string) {
 }
 
 export async function getWorkerById(workerId: string) {
+  const hasPreferredLanguage = await workerColumnExists("preferred_language");
+  const hasEmergencyContactName = await workerColumnExists("emergency_contact_name");
+  const hasEmergencyContactPhone = await workerColumnExists("emergency_contact_phone");
+
+  const selectColumns = [
+    "id",
+    "phone",
+    "name",
+    "partner_id",
+    "city",
+    "zone",
+    hasPreferredLanguage ? "preferred_language" : "NULL::text AS preferred_language",
+    hasEmergencyContactName
+      ? "emergency_contact_name"
+      : "NULL::text AS emergency_contact_name",
+    hasEmergencyContactPhone
+      ? "emergency_contact_phone"
+      : "NULL::text AS emergency_contact_phone",
+    "device_fingerprint",
+    "COALESCE(wallet_balance, 0)::float8 AS wallet_balance",
+    "COALESCE(streak_weeks, 0)::int4 AS streak_weeks",
+    "COALESCE(is_onboarded, false) AS is_onboarded",
+    "created_at::text AS created_at",
+  ];
+
   return queryMaybeOne<WorkerProfileRow>(
     `SELECT
-      id,
-      phone,
-      name,
-      partner_id,
-      city,
-      zone,
-      preferred_language,
-      emergency_contact_name,
-      emergency_contact_phone,
-      device_fingerprint,
-      COALESCE(wallet_balance, 0)::float8 AS wallet_balance,
-      COALESCE(streak_weeks, 0)::int4 AS streak_weeks,
-      COALESCE(is_onboarded, false) AS is_onboarded,
-      created_at::text AS created_at
+      ${selectColumns.join(",\n      ")}
      FROM workers
      WHERE id = $1`,
     [workerId]
@@ -163,6 +205,16 @@ export async function updateWorkerProfile(
     >
   >
 ) {
+  const optionalColumnAvailability = await Promise.all(
+    OPTIONAL_WORKER_PROFILE_COLUMNS.map(async (columnName) => [
+      columnName,
+      await workerColumnExists(columnName),
+    ] as const)
+  );
+  const availableOptionalColumns = new Set(
+    optionalColumnAvailability.filter(([, exists]) => exists).map(([columnName]) => columnName)
+  );
+
   const allowed = new Set([
     "name",
     "partner_id",
@@ -175,7 +227,11 @@ export async function updateWorkerProfile(
     "emergency_contact_phone",
   ]);
   const entries = Object.entries(updates).filter(
-    ([key, value]) => allowed.has(key) && value !== undefined
+    ([key, value]) =>
+      allowed.has(key) &&
+      value !== undefined &&
+      (!OPTIONAL_WORKER_PROFILE_COLUMNS.includes(key as (typeof OPTIONAL_WORKER_PROFILE_COLUMNS)[number]) ||
+        availableOptionalColumns.has(key))
   );
   if (entries.length === 0) {
     return getWorkerById(workerId);

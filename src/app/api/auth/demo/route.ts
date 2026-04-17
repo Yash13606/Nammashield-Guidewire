@@ -25,9 +25,6 @@ export async function POST() {
       zone: demoZone,
       is_onboarded: true,
       streak_weeks: 3,
-      preferred_language: "en",
-      emergency_contact_name: "Lakshmi Kumar",
-      emergency_contact_phone: "+91 90000 12345",
     });
 
     const existingPolicy = await getLatestActivePolicyForWorker(workerId);
