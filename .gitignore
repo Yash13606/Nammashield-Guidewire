@@ -76,7 +76,7 @@ Thumbs.db
 *.pid
 
 # Data and Uploads
-db/
+/db/
 download/
 upload/
 
